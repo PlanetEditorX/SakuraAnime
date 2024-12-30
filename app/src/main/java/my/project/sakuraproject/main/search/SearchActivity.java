@@ -6,7 +6,6 @@ import android.view.Menu;
 import android.view.MenuItem;
 
 import com.chad.library.adapter.base.BaseQuickAdapter;
-import com.r0adkll.slidr.Slidr;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,7 +25,6 @@ import my.project.sakuraproject.custom.CustomLoadMoreView;
 import my.project.sakuraproject.custom.CustomToast;
 import my.project.sakuraproject.main.base.BaseActivity;
 import my.project.sakuraproject.main.desc.DescActivity;
-import my.project.sakuraproject.util.SwipeBackLayoutUtil;
 import my.project.sakuraproject.util.Utils;
 
 public class SearchActivity extends BaseActivity<SearchContract.View, SearchPresenter> implements SearchContract.View {
@@ -45,12 +43,15 @@ public class SearchActivity extends BaseActivity<SearchContract.View, SearchPres
     private SearchView mSearchView;
     private boolean isSearch = false;
 
+    private boolean isSiliTag = false;
+    private String siliToolbarTitle;
+
     @Override
     protected SearchPresenter createPresenter() {
         if (Utils.isImomoe())
-            return new SearchPresenter(Sakura.SEARCH_API, page,  title,this);
+            return new SearchPresenter(Sakura.SEARCH_API, page, title, isSiliTag, this);
         else
-            return new SearchPresenter(Sakura.SEARCH_API + title + "/", page,  "",this);
+            return new SearchPresenter(Sakura.SEARCH_API + title + "/", page,  "", false, this);
     }
 
     @Override
@@ -66,7 +67,7 @@ public class SearchActivity extends BaseActivity<SearchContract.View, SearchPres
 
     @Override
     protected void init() {
-        Slidr.attach(this, Utils.defaultInit());
+//        Slidr.attach(this, Utils.defaultInit());
         getBundle();
         initToolbar();
         initSwipe();
@@ -75,17 +76,23 @@ public class SearchActivity extends BaseActivity<SearchContract.View, SearchPres
 
     @Override
     protected void initBeforeView() {
-        SwipeBackLayoutUtil.convertActivityToTranslucent(this);
+//        SwipeBackLayoutUtil.convertActivityToTranslucent(this);
     }
 
     public void getBundle() {
         Bundle bundle = getIntent().getExtras();
-        if (null != bundle && !bundle.isEmpty())
+        if (null != bundle && !bundle.isEmpty()) {
+            siliToolbarTitle = bundle.getString("siliToolbarTitle");
             title = bundle.getString("title");
+            isSiliTag = bundle.getBoolean("isSiliTag");
+        }
     }
 
     public void initToolbar() {
         toolbar.setTitle("");
+        if (isSiliTag) {
+            toolbar.setTitle(siliToolbarTitle);
+        }
         setSupportActionBar(toolbar);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         toolbar.setNavigationOnClickListener(view -> finish());
@@ -99,7 +106,6 @@ public class SearchActivity extends BaseActivity<SearchContract.View, SearchPres
     public void initAdapter() {
 //        mRecyclerView.setLayoutManager(new GridLayoutManager(this, Utils.isPad() ? 5 : 3));
         adapter = new AnimeListAdapter(this, searchList, false);
-        adapter.openLoadAnimation();
         adapter.openLoadAnimation(BaseQuickAdapter.ALPHAIN);
         adapter.setOnItemClickListener((adapter, view, position) -> {
             if (!Utils.isFastClick()) return;
@@ -143,6 +149,7 @@ public class SearchActivity extends BaseActivity<SearchContract.View, SearchPres
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
+        if (isSiliTag) return false;
         int id = item.getItemId();
         if (id == R.id.search) {
             return true;
@@ -152,13 +159,14 @@ public class SearchActivity extends BaseActivity<SearchContract.View, SearchPres
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
+        if (isSiliTag) return false;
         getMenuInflater().inflate(R.menu.search_menu, menu);
         final MenuItem item = menu.findItem(R.id.search);
         mSearchView = (SearchView) MenuItemCompat.getActionView(item);
         mSearchView.onActionViewExpanded();
         mSearchView.setSubmitButtonEnabled(true);
         mSearchView.setQueryHint(Utils.getString(R.string.search_hint));
-        mSearchView.setMaxWidth(2000);
+        mSearchView.setMaxWidth(4000);
         if (!title.isEmpty()) {
             mSearchView.setQuery(title, false);
             mSearchView.clearFocus();
@@ -232,9 +240,9 @@ public class SearchActivity extends BaseActivity<SearchContract.View, SearchPres
             isSearch = false;
             if (!mActivityFinish) {
                 if (isMain) {
+                    setRecyclerViewView();
                     mSwipe.setRefreshing(false);
                     searchList = list;
-                    setRecyclerViewView();
                     adapter.setNewData(searchList);
                 } else {
                     adapter.addData(list);
@@ -250,7 +258,7 @@ public class SearchActivity extends BaseActivity<SearchContract.View, SearchPres
             isSearch = false;
             if (!mActivityFinish) {
                 if (isMain) {
-                    setRecyclerViewView();
+                    setRecyclerViewEmpty();
                     mSwipe.setRefreshing(false);
                     errorTitle.setText(msg);
                     adapter.setEmptyView(errorView);
@@ -271,7 +279,7 @@ public class SearchActivity extends BaseActivity<SearchContract.View, SearchPres
     @Override
     public void onResume() {
         super.onResume();
-        if (Utils.isPad()) setRecyclerViewView();
+        setRecyclerViewView();
     }
 
     @Override
@@ -279,22 +287,22 @@ public class SearchActivity extends BaseActivity<SearchContract.View, SearchPres
         setRecyclerViewView();
     }
 
+    private void setRecyclerViewEmpty() {
+        mRecyclerView.setLayoutManager(new GridLayoutManager(this, 1));
+    }
+
     private void setRecyclerViewView() {
+        position = mRecyclerView.getLayoutManager() == null ? 0 : ((GridLayoutManager) mRecyclerView.getLayoutManager()).findFirstVisibleItemPosition();
         String config = this.getResources().getConfiguration().toString();
         boolean isInMagicWindow = config.contains("miui-magic-windows");
-        if (searchList.size() == 0) {
-            mRecyclerView.setLayoutManager(new GridLayoutManager(this, 1));
-            return;
-        }
-        if (!Utils.isPad()) {
-            mRecyclerView.setLayoutManager(new GridLayoutManager(this, 3));
-        }
+        if (!Utils.isPad())
+            mRecyclerView.setLayoutManager(new GridLayoutManager(this, isPortrait ? 3 : 5));
         else {
-            if (isInMagicWindow) {
+            if (isInMagicWindow)
                 mRecyclerView.setLayoutManager(new GridLayoutManager(this, 4));
-            } else {
-                mRecyclerView.setLayoutManager(new GridLayoutManager(this, 5));
-            }
+            else
+                mRecyclerView.setLayoutManager(new GridLayoutManager(this, isPortrait ? 5 : 8));
         }
+        mRecyclerView.getLayoutManager().scrollToPosition(position);
     }
 }

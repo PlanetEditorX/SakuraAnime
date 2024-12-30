@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.coordinatorlayout.widget.CoordinatorLayout
+    android:id="@+id/root"
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:background="@color/window_bg"
@@ -16,26 +17,8 @@
     <View
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@drawable/desc_gradient"
-        android:fitsSystemWindows="true" />
+        android:background="@drawable/desc_gradient" />
 
-    <!--<com.google.android.material.appbar.AppBarLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@color/translucent"
-        android:theme="@style/AppTheme.AppBarOverlay"
-        app:elevation="0dp">
-
-        <androidx.appcompat.widget.Toolbar
-            android:id="@+id/toolbar"
-            style="@style/ToolbarStyle"
-            android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
-            android:background="@color/translucent"
-            android:theme="@style/DescToolbarTheme"
-            app:popupTheme="@style/AppTheme.PopupOverlay" />
-
-    </com.google.android.material.appbar.AppBarLayout>-->
 
     <my.project.sakuraproject.custom.MySwipeRefreshLayout
         android:id="@+id/mSwipe"
@@ -45,51 +28,59 @@
         <androidx.core.widget.NestedScrollView
             android:id="@+id/scrollview"
             android:layout_width="match_parent"
-            android:layout_height="match_parent">
+            android:layout_height="match_parent"
+            android:paddingBottom="100dp"
+            android:clipToPadding="false">
 
             <LinearLayout
+                android:id="@+id/app_bar_margin"
                 android:clipChildren="true"
-                android:layout_marginTop="?attr/actionBarSize"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <LinearLayout
+                <com.google.android.material.appbar.AppBarLayout
+                    android:id="@+id/app_bar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@null"
+                    android:theme="@style/AppTheme.AppBarOverlay">
+
+                    <androidx.appcompat.widget.Toolbar
+                        android:id="@+id/toolbar"
+                        style="@style/ToolbarStyle"
+                        android:layout_width="match_parent"
+                        android:layout_height="?attr/actionBarSize"
+                        app:titleTextColor="@color/white"
+                        app:popupTheme="@style/AppTheme.PopupOverlay" />
+
+                </com.google.android.material.appbar.AppBarLayout>
+
+                <RelativeLayout
                     android:id="@+id/desc_view"
                     android:visibility="visible"
                     android:layout_width="match_parent"
                     android:clipChildren="false"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical">
+                    android:layout_marginLeft="16dp">
 
                     <androidx.constraintlayout.widget.ConstraintLayout
                         android:id="@+id/img_box"
-                        android:layout_width="match_parent"
-                        android:layout_height="203dp">
+                        android:layout_width="wrap_content"
+                        android:layout_height="150dp">
 
-                        <ImageView
-                            android:id="@+id/exit"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginLeft="20dp"
-                            android:clickable="true"
-                            android:src="@drawable/baseline_arrow_back_white_48dp"
-                            app:layout_constraintStart_toStartOf="parent"
-                            app:layout_constraintTop_toTopOf="parent" />
-
-                        <androidx.cardview.widget.CardView
+                        <com.google.android.material.card.MaterialCardView
                             android:id="@+id/card_view"
                             android:layout_width="0dp"
                             android:layout_height="0dp"
                             app:cardBackgroundColor="@android:color/transparent"
-                            app:cardCornerRadius="4dp"
-                            app:cardElevation="4dp"
+                            app:cardCornerRadius="2dp"
                             app:layout_constraintDimensionRatio="W,1:1.4"
                             app:layout_constraintBottom_toBottomOf="parent"
                             app:layout_constraintEnd_toEndOf="parent"
                             app:layout_constraintStart_toStartOf="parent"
                             app:layout_constraintTop_toTopOf="parent"
-                            app:cardUseCompatPadding="false">
+                            style="?attr/materialCardViewElevatedStyle">
 
                             <RelativeLayout
                                 android:layout_width="match_parent"
@@ -101,7 +92,7 @@
                                     android:layout_height="match_parent"
                                     android:scaleType="centerCrop" />
 
-                                <androidx.appcompat.widget.AppCompatTextView
+                                <!--<androidx.appcompat.widget.AppCompatTextView
                                     android:id="@+id/score_view"
                                     android:visibility="gone"
                                     android:layout_width="wrap_content"
@@ -140,129 +131,88 @@
                                         android:textSize="12sp"
                                         android:textColor="#f3f3f3" />
 
-                                </LinearLayout>
+                                </LinearLayout>-->
 
                             </RelativeLayout>
-                        </androidx.cardview.widget.CardView>
+                        </com.google.android.material.card.MaterialCardView>
 
                     </androidx.constraintlayout.widget.ConstraintLayout>
 
-<!--                    <RelativeLayout-->
-<!--                        android:layout_width="match_parent"-->
-<!--                        android:layout_height="wrap_content"-->
-<!--                        android:clipChildren="true"-->
-<!--                        android:layout_marginTop="10dp"-->
-<!--                        android:layout_marginRight="10dp"-->
-<!--                        android:layout_marginBottom="10dp"-->
-<!--                        android:layout_weight="6">-->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_centerVertical="true"
+                        android:layout_marginLeft="5dp"
+                        android:layout_toRightOf="@+id/img_box"
+                        android:orientation="vertical">
 
-<!--                        <my.project.sakuraproject.custom.InsideScrollView-->
-<!--                            android:id="@+id/inside_view"-->
-<!--                            android:scrollbars="none"-->
-<!--                            android:layout_width="match_parent"-->
-<!--                            android:layout_height="wrap_content">-->
-
-                        <RelativeLayout
+                        <!--<my.project.sakuraproject.custom.MyTextView
+                            android:id="@+id/title"
                             android:layout_width="match_parent"
-                            android:layout_height="wrap_content">
+                            android:layout_height="wrap_content"
+                            android:ellipsize="marquee"
+                            android:focusable="true"
+                            android:focusableInTouchMode="true"
+                            android:marqueeRepeatLimit="marquee_forever"
+                            android:scrollHorizontally="true"
+                            android:shadowColor="@color/light_toolbar_color_lt23"
+                            android:shadowDx="1.0"
+                            android:shadowDy="1.0"
+                            android:shadowRadius="2.0"
+                            android:singleLine="true"
+                            android:textColor="@color/white"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />-->
 
-                            <my.project.sakuraproject.custom.MyTextView
+                        <TextView
+                            android:id="@+id/title"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:ellipsize="end"
+                            android:maxLines="2"
+                            android:shadowColor="@color/light_toolbar_color_lt23"
+                            android:shadowDx="1.0"
+                            android:shadowDy="1.0"
+                            android:shadowRadius="2.0"
+                            android:textColor="@color/white"
+                            android:textSize="18sp" />
+
+                        <HorizontalScrollView
+                            android:id="@+id/scroll_view"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:scrollbars="none">
+
+                            <com.google.android.material.chip.ChipGroup
+                                android:id="@+id/chip_group"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:id="@+id/title"
-                                android:layout_marginTop="10dp"
-                                android:layout_marginLeft="20dp"
-                                android:layout_marginRight="20dp"
-                                android:gravity="center_horizontal"
-                                android:focusable="true"
-                                android:focusableInTouchMode="true"
-                                android:marqueeRepeatLimit="marquee_forever"
-                                android:ellipsize="marquee"
-                                android:scrollHorizontally="true"
-                                android:singleLine="true"
-                                android:textStyle="bold"
-                                android:shadowColor="@color/light_toolbar_color_lt23"
-                                android:shadowDx="1.0"
-                                android:shadowDy="1.0"
-                                android:shadowRadius="2.0"
-                                android:textColor="@color/white"
-                                android:textSize="18sp" />
+                                app:singleLine="true">
+                            </com.google.android.material.chip.ChipGroup>
 
-                            <LinearLayout
-                                android:id="@+id/btn_view"
-                                android:layout_below="@id/title"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_centerHorizontal="true"
-                                android:orientation="horizontal">
+                        </HorizontalScrollView>
 
-                                <com.google.android.material.button.MaterialButton
-                                    android:id="@+id/favorite"
-                                    style="@style/Widget.MaterialComponents.Button.OutlinedButton.Icon"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:textSize="14sp"
-                                    app:strokeColor="@color/mtrl_btn_stroke_color_selector"
-                                    android:textColor="@color/white"
-                                    app:iconTint="@color/white"/>
+                        <TextView
+                            android:id="@+id/score_view"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="5dp"
+                            android:gravity="start|center_vertical"
+                            android:textColor="@color/white"
+                            android:textSize="14sp"
+                            android:visibility="gone" />
 
-                                <com.google.android.material.button.MaterialButton
-                                    android:id="@+id/browser"
-                                    android:layout_marginLeft="5dp"
-                                    style="@style/Widget.MaterialComponents.Button.OutlinedButton.Icon"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:textSize="14sp"
-                                    app:icon="@drawable/baseline_language_white_48dp"
-                                    android:text="@string/open_browser"
-                                    app:strokeColor="@color/mtrl_btn_stroke_color_selector"
-                                    android:textColor="@color/white"
-                                    app:iconTint="@color/white"/>
+                        <TextView
+                            android:id="@+id/update_time"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="start|center_vertical"
+                            android:textColor="@color/white"
+                            android:textSize="14sp" />
 
-                            </LinearLayout>
+                    </LinearLayout>
 
-                            <co.lujun.androidtagview.TagContainerLayout
-                                android:layout_below="@+id/btn_view"
-                                android:id="@+id/tag_view"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="5dp"
-                                app:container_border_color="@color/translucent"
-                                app:container_background_color="@color/translucent"
-                                app:tag_corner_radius="4dp"
-                                app:container_gravity="center"
-                                app:tag_text_color="@color/white"
-                                app:tag_border_color="#73e55578"
-                                app:tag_background_color="#73e55578"
-                                app:tag_clickable="true"
-                                app:tag_horizontal_padding="10dp"
-                                app:tag_theme="none"/>
-
-                            <com.ctetin.expandabletextviewlibrary.ExpandableTextView
-                                android:id="@+id/desc"
-                                android:layout_below="@id/tag_view"
-                                android:layout_marginTop="10dp"
-                                android:layout_marginLeft="10dp"
-                                android:layout_marginRight="10dp"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                app:ep_need_link="false"
-                                app:ep_need_mention="true"
-                                app:ep_max_line="4"
-                                android:lineSpacingExtra="4dp"
-                                app:ep_need_contract="true"
-                                app:ep_need_animation="true"
-                                app:ep_expand_color="@color/colorAccent"
-                                android:textColor="@color/white"
-                                android:textSize="14sp" />
-
-                        </RelativeLayout>
-
-<!--                        </my.project.sakuraproject.custom.InsideScrollView>-->
-
-<!--                    </RelativeLayout>-->
-
-                </LinearLayout>
+                </RelativeLayout>
 
                 <!-- 剧集视图 -->
                 <LinearLayout
@@ -270,42 +220,124 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:layout_marginTop="10dp"
+                    android:layout_marginTop="5dp"
                     android:padding="5dp"
                     android:visibility="gone">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/favorite"
+                            app:rippleColor="@color/ripple_color"
+                            style="@style/Widget.Material3.Button.TextButton.Icon"
+                            android:textColor="@color/white"
+                            app:iconTint="@color/white"
+                            app:elevation="5dp"
+                            android:layout_marginLeft="2dp"
+                            android:layout_marginRight="2dp"
+                            android:text="追番"
+                            app:iconGravity="top"
+                            app:icon="@drawable/baseline_favorite_border_white_48dp"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"/>
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/download"
+                            app:rippleColor="@color/ripple_color"
+                            style="@style/Widget.Material3.Button.TextButton.Icon"
+                            android:textColor="@color/white"
+                            app:iconTint="@color/white"
+                            app:elevation="5dp"
+                            android:layout_marginLeft="2dp"
+                            android:layout_marginRight="2dp"
+                            android:text="下载"
+                            app:iconGravity="top"
+                            app:icon="@drawable/baseline_download_white_48dp"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"/>
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/browser"
+                            app:rippleColor="@color/ripple_color"
+                            style="@style/Widget.Material3.Button.TextButton.Icon"
+                            android:textColor="@color/white"
+                            app:iconTint="@color/white"
+                            app:elevation="5dp"
+                            android:layout_marginLeft="2dp"
+                            android:layout_marginRight="2dp"
+                            android:text="源网页"
+                            app:iconGravity="top"
+                            app:icon="@drawable/baseline_language_white_48dp"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"/>
+
+                    </LinearLayout>
+
+                    <!--<co.lujun.androidtagview.TagContainerLayout
+                        android:layout_below="@+id/title"
+                        android:id="@+id/tag_view"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        app:container_border_color="@color/translucent"
+                        app:container_background_color="@color/translucent"
+                        app:tag_corner_radius="4dp"
+                        app:container_gravity="center"
+                        app:tag_text_color="@color/white"
+                        app:tag_border_color="#73e55578"
+                        app:tag_background_color="#73e55578"
+                        app:tag_clickable="true"
+                        app:tag_horizontal_padding="10dp"
+                        app:tag_theme="none"/>-->
+
+                    <com.ctetin.expandabletextviewlibrary.ExpandableTextView
+                        android:id="@+id/desc"
+                        android:layout_margin="10dp"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        app:ep_need_link="false"
+                        app:ep_need_mention="true"
+                        app:ep_max_line="4"
+                        android:lineSpacingExtra="4dp"
+                        app:ep_need_contract="true"
+                        app:ep_need_animation="true"
+                        app:ep_expand_color="@color/colorAccent"
+                        android:textColor="@color/white"
+                        android:textSize="14sp" />
 
                     <RelativeLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="8dp">
 
-                        <androidx.appcompat.widget.AppCompatTextView
-                            android:layout_centerVertical="true"
-                            android:id="@+id/selected_text"
-                            android:layout_width="wrap_content"
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginLeft="8dp"
-                            android:text="选集"
-                            android:textSize="16sp"
-                            android:textColor="@color/white"
-                            android:textStyle="bold"/>
+                            app:endIconTint="@android:color/white"
+                            app:boxStrokeColor="@color/text_input_layout_stroke_color"
+                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
 
-                        <TextView
-                            android:visibility="gone"
-                            android:layout_toRightOf="@id/selected_text"
-                            android:id="@+id/spinner"
-                            android:textColor="@color/colorAccent"
-                            android:gravity="center_vertical"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_centerVertical="true"
-                            android:drawableRight="@drawable/baseline_arrow_drop_down_white_48dp"
-                            android:drawablePadding="5dp"
-                            android:layout_marginLeft="8dp"/>
+                            <AutoCompleteTextView
+                                android:id="@+id/selected_text"
+                                android:focusable="false"
+                                android:inputType="none"
+                                android:textColor="@color/white"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:textSize="16sp"
+                                android:textStyle="bold"/>
+                        </com.google.android.material.textfield.TextInputLayout>
+
                     </RelativeLayout>
 
                     <androidx.recyclerview.widget.RecyclerView
-                        android:id="@+id/details_list"
+                        android:id="@+id/drama_list"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:clipToPadding="false"
@@ -315,14 +347,13 @@
 
                     <RelativeLayout
                         android:id="@+id/open_drama"
-                        android:layout_width="wrap_content"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_centerVertical="true"
-                        android:layout_gravity="right"
                         android:layout_marginTop="4dp"
                         android:layout_marginRight="4dp">
 
-                        <ImageView
+                        <!--<ImageView
                             android:id="@+id/down_img"
                             android:layout_width="20dp"
                             android:layout_height="20dp"
@@ -330,12 +361,31 @@
                             android:layout_toRightOf="@id/drama"
                             android:scaleType="centerInside"
                             android:src="@drawable/ic_keyboard_arrow_down_white_48dp"
-                            android:tint="@color/white" />
+                            android:tint="@color/white" />-->
 
-                        <androidx.appcompat.widget.AppCompatTextView
-                            android:id="@+id/drama"
+                        <TextView
+                            android:id="@+id/order"
+                            android:layout_toLeftOf="@+id/drama"
+                            android:layout_marginRight="15dp"
+                            android:drawableEnd="@drawable/ic_baseline_swap_vert_24"
+                            android:drawableTint="@color/white"
+                            android:drawablePadding="2dp"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:text="列表反序"
+                            android:textStyle="bold"
+                            android:textColor="@color/colorAccent" />
+
+                        <TextView
+                            android:id="@+id/drama"
+                            android:layout_alignParentEnd="true"
+                            android:drawableEnd="@drawable/ic_keyboard_arrow_down_white_48dp"
+                            android:drawableTint="@color/white"
+                            android:drawablePadding="2dp"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
                             android:text="展开全部"
                             android:textStyle="bold"
                             android:textColor="@color/colorAccent" />
@@ -350,16 +400,36 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
-                    <androidx.appcompat.widget.AppCompatTextView
+                    <RelativeLayout
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginLeft="8dp"
-                        android:layout_marginBottom="8dp"
-                        android:text="多季"
-                        android:textSize="16sp"
-                        android:textColor="@color/white"
-                        android:textStyle="bold">
-                    </androidx.appcompat.widget.AppCompatTextView>
+                        android:layout_height="50dp"
+                        android:background="@drawable/desc_stroke"
+                        android:layout_marginBottom="10dp"
+                        android:orientation="vertical"
+                        android:padding="10dp">
+
+                        <!--<androidx.appcompat.widget.AppCompatTextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginLeft="8dp"
+                            android:layout_marginBottom="8dp"
+                            android:text="多季"
+                            android:textSize="16sp"
+                            android:textColor="@color/white"
+                            android:textStyle="bold">-->
+
+                        <TextView
+                            android:layout_centerVertical="true"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginLeft="8dp"
+                            android:text="多季"
+                            android:textSize="16sp"
+                            android:textColor="@color/text_color_primary"
+                            android:textStyle="bold"/>
+
+                    </RelativeLayout>
+
                     <androidx.recyclerview.widget.RecyclerView
                         android:id="@+id/multi_list"
                         android:layout_width="match_parent"
@@ -378,15 +448,35 @@
                     android:padding="5dp"
                     android:visibility="gone">
 
-                    <androidx.appcompat.widget.AppCompatTextView
+                    <RelativeLayout
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginLeft="8dp"
-                        android:layout_marginBottom="8dp"
-                        android:text="相关推荐"
-                        android:textSize="16sp"
-                        android:textColor="@color/white"
-                        android:textStyle="bold"/>
+                        android:layout_height="50dp"
+                        android:background="@drawable/desc_stroke"
+                        android:layout_marginBottom="10dp"
+                        android:orientation="vertical"
+                        android:padding="10dp">
+
+                        <!--<androidx.appcompat.widget.AppCompatTextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginLeft="8dp"
+                            android:layout_marginBottom="8dp"
+                            android:text="相关推荐"
+                            android:textSize="16sp"
+                            android:textColor="@color/text_color_primary"
+                            android:textStyle="bold"/>-->
+
+                        <TextView
+                            android:layout_centerVertical="true"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginLeft="8dp"
+                            android:text="相关推荐"
+                            android:textSize="16sp"
+                            android:textColor="@color/text_color_primary"
+                            android:textStyle="bold"/>
+
+                    </RelativeLayout>
 
                     <androidx.recyclerview.widget.RecyclerView
                         android:id="@+id/recommend_list"
@@ -426,22 +516,25 @@
 
     </my.project.sakuraproject.custom.MySwipeRefreshLayout>
 
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/download"
-        android:src="@drawable/baseline_download_white_48dp"
-        android:layout_width="wrap_content"
+    <!--<com.google.android.material.bottomappbar.BottomAppBar
+        android:id="@+id/bottomAppBar"
+        android:visibility="invisible"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom|end"
-        android:visibility="gone"
-        app:layout_behavior="my.project.sakuraproject.custom.ScrollAwareBehavior"
-        android:layout_margin="@dimen/fab_margin" />
+        android:backgroundTint="@color/night"
+        android:layout_gravity="bottom"
+        app:fabAlignmentMode="end"
+        app:hideOnScroll="true"
+        app:menu="@menu/bottom_app_bar"
+        style="@style/Widget.Material3.BottomAppBar"/>
 
-    <androidx.coordinatorlayout.widget.CoordinatorLayout
-        android:id="@+id/msg"
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/to_back"
+        app:backgroundTint="@color/colorAccent"
+        app:tint="@android:color/white"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        app:layout_anchor="@id/tag_view"
-        app:layout_anchorGravity="center" />
+        app:srcCompat="@drawable/outline_reply_white_48dp"
+        app:layout_anchor="@id/bottomAppBar" />-->
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
-

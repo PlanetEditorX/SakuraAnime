@@ -32,6 +32,7 @@ import android.view.Display;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.WindowManager;
+import android.view.animation.AlphaAnimation;
 import android.view.animation.Animation;
 import android.view.animation.ScaleAnimation;
 import android.view.inputmethod.InputMethodManager;
@@ -40,17 +41,18 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 
 import com.bumptech.glide.Glide;
-import com.bumptech.glide.load.DecodeFormat;
 import com.bumptech.glide.load.model.GlideUrl;
 import com.bumptech.glide.load.model.LazyHeaders;
+import com.bumptech.glide.load.resource.bitmap.BitmapTransitionOptions;
 import com.bumptech.glide.request.RequestOptions;
 import com.bumptech.glide.request.target.SimpleTarget;
+import com.bumptech.glide.request.target.Target;
 import com.bumptech.glide.request.transition.DrawableCrossFadeFactory;
 import com.bumptech.glide.request.transition.Transition;
-import com.r0adkll.slidr.model.SlidrConfig;
-import com.r0adkll.slidr.model.SlidrPosition;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import org.greenrobot.eventbus.EventBus;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.text.DecimalFormat;
@@ -107,7 +109,22 @@ public class Utils {
         throw new NullPointerException("u should init first");
     }
 
+    public static String getPrivateDbPath() {
+        return context.getFilesDir().getPath()+"/sakura.db";
+    }
+
+    /**
+     * 用户是否有读写权限
+     * @return
+     */
+    public static boolean hasFilePermission() {
+        int userSet = (int) SharedPreferencesUtils.getParam(context, "set_file_manager_permission", 0);
+        return userSet == 2;
+    }
+
     public static void createFile() {
+        if (!hasFilePermission())
+            return;
         File dataDir = new File(Environment.getExternalStorageDirectory() + "/SakuraAnime/Database");
         if (!dataDir.exists())
             dataDir.mkdirs();
@@ -137,7 +154,7 @@ public class Utils {
      */
     public static AlertDialog getProDialog(Activity activity, @StringRes int id) {
         AlertDialog alertDialog;
-        AlertDialog.Builder builder = new AlertDialog.Builder(activity, R.style.DialogStyle);
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(activity, R.style.DialogStyle);
         View view = LayoutInflater.from(activity).inflate(R.layout.dialog_proress, null);
         RelativeLayout root = view.findViewById(R.id.root);
         TextView msg = view.findViewById(R.id.msg);
@@ -178,6 +195,23 @@ public class Utils {
     }
 
     /**
+     * 选择视频播放器
+     *
+     * @param url
+     */
+    public static void openOtherSoftware(Context context, String url) {
+        final Intent intent = new Intent();
+        intent.setAction(Intent.ACTION_VIEW);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        intent.setDataAndType(Uri.parse(url), "*/*");
+        try {
+            context.startActivity(Intent.createChooser(intent, "请选择相关软件进行操作"));
+        } catch (ActivityNotFoundException e) {
+            CustomToast.showToast(getContext(), "没有找到匹配的程序", CustomToast.WARNING);
+        }
+    }
+
+    /**
      * 通过浏览器打开
      *
      * @param url
@@ -201,6 +235,9 @@ public class Utils {
      * @param url
      */
     public static void viewInChrome(Context context, String url) {
+        boolean isSilisili = url.contains("/vodplay/");
+        if (!url.contains("http"))
+            url = BaseModel.getDomain(isSilisili) + url;
         CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder();
         //Sets the toolbar color.
         builder.setToolbarColor(context.getResources().getColor(R.color.night));
@@ -224,6 +261,10 @@ public class Utils {
         return getContext().getResources().getStringArray(id);
     }
 
+    public static int[] getIntArray(@ArrayRes int id) {
+        return getContext().getResources().getIntArray(id);
+    }
+
     /**
      * 获取当前日期是星期几
      *
@@ -238,24 +279,6 @@ public class Utils {
         if (w < 0)
             w = 0;
         return weekDays[w];
-    }
-
-    /**
-     * 首次进入主页弹窗
-     */
-    public static void showX5Info(Context context) {
-        AlertDialog alertDialog;
-        AlertDialog.Builder builder = new AlertDialog.Builder(context, R.style.DialogStyle);
-        builder.setPositiveButton(getString(R.string.x5_info_positive), null);
-        builder.setMessage(getString(R.string.x5_info));
-        builder.setTitle(getString(R.string.x5_info_title));
-        builder.setCancelable(false);
-        alertDialog = builder.create();
-        alertDialog.show();
-        alertDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-            SharedPreferencesUtils.setParam(getContext(), "show_x5_info", false);
-            alertDialog.dismiss();
-        });
     }
 
     public static void hideKeyboard(View view) {
@@ -371,7 +394,7 @@ public class Utils {
      *
      * @return
      */
-    public static SlidrConfig defaultInit() {
+    /*public static SlidrConfig defaultInit() {
         SlidrConfig.Builder mBuilder;
         mBuilder = new SlidrConfig.Builder()
                 .position(SlidrPosition.LEFT)
@@ -382,7 +405,7 @@ public class Utils {
                 .edge((Boolean) SharedPreferencesUtils.getParam(getContext(), "slidr_config", false))
                 .edgeSize(0.18f);// The % of the screen that counts as the edge, default 18%;
         return mBuilder.build();
-    }
+    }*/
 
     public static boolean getSlidrConfig() {
         return (Boolean) SharedPreferencesUtils.getParam(getContext(), "slidr_config", false);
@@ -402,62 +425,73 @@ public class Utils {
     /**
      * 设置默认图片
      * @param context
-     * @param url
+     * @param img
+     * @param imageView
+     */
+    public static void setDefaultImage(Context context, String img, ImageView imageView) {
+        if (img == null || img.isEmpty()) {
+            imageView.setImageDrawable(context.getDrawable(R.drawable.error));
+            return;
+        }
+        DrawableCrossFadeFactory drawableCrossFadeFactory = new DrawableCrossFadeFactory.Builder(300).setCrossFadeEnabled(true).build();
+        RequestOptions options = new RequestOptions()
+                .override(Target.SIZE_ORIGINAL, Target.SIZE_ORIGINAL);
+        GlideUrl imgUrl = new GlideUrl(img, new LazyHeaders.Builder()
+                .addHeader("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36")
+                .build());
+        Glide.with(context)
+                .load(imgUrl)
+                .apply(options)
+                .placeholder(getTheme() ? context.getDrawable(R.drawable.loading_night) : context.getDrawable(R.drawable.loading_light))
+                .error(context.getDrawable(R.drawable.error))
+//                .transition(DrawableTransitionOptions.withCrossFade(drawableCrossFadeFactory))
+                .into(imageView);
+    }
+
+    /**
+     * 设置默认图片
+     * @param context
+     * @param img
      * @param imageView
      * @param setPalette
      * @param cardView
      * @param textView
      */
-    public static void setDefaultImage(Context context, String url, String htmlUrl, ImageView imageView, boolean setPalette, CardView cardView, TextView textView) {
-        DrawableCrossFadeFactory drawableCrossFadeFactory = new DrawableCrossFadeFactory.Builder(300).setCrossFadeEnabled(true).build();
-        GlideUrl imgUrl;
-        if (!htmlUrl.contains("/view/"))
-            imgUrl = new GlideUrl(getImgUrl(url, false), new LazyHeaders.Builder()
-                .addHeader("Referer", BaseModel.getDomain(false) + "/")
-                .build());
-        else
-            imgUrl = new GlideUrl(getImgUrl(url, true));
-        RequestOptions options = new RequestOptions()
-                .centerCrop()
-                .format(DecodeFormat.PREFER_RGB_565)
-                .placeholder(getTheme() ? R.drawable.loading_night : R.drawable.loading_light)
-                .error(R.drawable.error);
+    public static void setDefaultImage(Context context, String img, String htmlUrl, ImageView imageView, boolean setPalette, CardView cardView, TextView textView) {
+        imageView.setImageDrawable(getTheme() ? context.getDrawable(R.drawable.loading_night) : context.getDrawable(R.drawable.loading_light));
+        if (img == null || img.isEmpty()) {
+            imageView.setImageDrawable(context.getDrawable(R.drawable.error));
+            return;
+        }
+        GlideUrl imgUrl = new GlideUrl(img.contains("yhdmtu") ? getImgUrl(img, false) : img);
         Glide.with(context)
                 .asBitmap()
+                .transition(BitmapTransitionOptions.withCrossFade())
                 .load(imgUrl)
-//                .transition(DrawableTransitionOptions.withCrossFade(drawableCrossFadeFactory))
-                .apply(options)
-//                .into(imageView);
                 .into(new SimpleTarget<Bitmap>() {
                     @Override
                     public void onResourceReady(@NonNull Bitmap resource, @Nullable Transition<? super Bitmap> transition) {
-                        imageView.setImageBitmap(resource);
+                        if (img == imageView.getTag(R.id.imageid)) {
+                            imageView.setImageBitmap(resource);
+                            if (!getTheme() && setPalette) {
+                                // 设置Palette
+                                Palette.from(resource).generate(palette -> {
+                                    Palette.Swatch swatch = palette.getDarkVibrantSwatch();
+                                    if (swatch != null) {
+                                        cardView.setCardBackgroundColor(swatch.getRgb());
+                                        textView.setTextColor(swatch.getBodyTextColor());
+                                    }
+                                });
+                            }
+                        }
                     }
 
                     @Override
                     public void onLoadFailed(@Nullable Drawable errorDrawable) {
-                        EventBus.getDefault().post(new UpdateImgBean(url, htmlUrl));
+                        imageView.setImageDrawable(context.getDrawable(R.drawable.error));
+                        EventBus.getDefault().post(new UpdateImgBean(img, htmlUrl));
                     }
                 });
-        if (!getTheme() && setPalette)
-            // 设置Palette
-            Glide.with(context).asBitmap().load(imgUrl).into(new SimpleTarget<Bitmap>() {
-                @Override
-                public void onResourceReady(@NonNull Bitmap resource, @Nullable Transition<? super Bitmap> transition) {
-                    Palette.from(resource).generate(palette -> {
-                        Palette.Swatch swatch = palette.getDarkVibrantSwatch();
-                        if (swatch != null) {
-                            cardView.setCardBackgroundColor(swatch.getRgb());
-                            textView.setTextColor(swatch.getBodyTextColor());
-                        }
-                    });
-                }
-
-                @Override
-                public void onLoadFailed(@Nullable @org.jetbrains.annotations.Nullable Drawable errorDrawable) {
-                    EventBus.getDefault().post(new UpdateImgBean(url, htmlUrl));
-                }
-            });
     }
 
     public static void setCardDefaultBg(Context context, CardView cardView, TextView textView) {
@@ -466,6 +500,11 @@ public class Utils {
     }
 
     public static void setImgViewBg(Context context, int source, String img, String descUrl, ImageView imageView) {
+        if (img == null || img.isEmpty()) {
+            imageView.setImageDrawable(context.getDrawable(R.drawable.error));
+            return;
+        }
+        imageView.setImageDrawable(getTheme() ? context.getDrawable(R.drawable.loading_night) : context.getDrawable(R.drawable.loading_light));
         GlideUrl imgUrl;
         if (source == 1)
             imgUrl = new GlideUrl(getImgUrl(img, true));
@@ -473,23 +512,16 @@ public class Utils {
             imgUrl = new GlideUrl(getImgUrl(img, false), new LazyHeaders.Builder()
                     .addHeader("Referer", BaseModel.getDomain(false) + "/")
                     .build());
-        DrawableCrossFadeFactory drawableCrossFadeFactory = new DrawableCrossFadeFactory.Builder(300).setCrossFadeEnabled(true).build();
-        RequestOptions options = new RequestOptions()
-                .centerCrop()
-                .format(DecodeFormat.PREFER_RGB_565)
-                .placeholder(getTheme() ? R.drawable.loading_light : R.drawable.loading_night)
-                .error(R.drawable.error);
         Glide.with(context)
                 .asBitmap()
+                .transition(BitmapTransitionOptions.withCrossFade())
                 .load(imgUrl)
-//                .transition(DrawableTransitionOptions.withCrossFade(drawableCrossFadeFactory))
-                .apply(options)
                 .apply(RequestOptions.bitmapTransform( new BlurTransformation(15, 5)))
-//                .into(imageView);
                 .into(new SimpleTarget<Bitmap>() {
                     @Override
                     public void onResourceReady(@NonNull Bitmap resource, @Nullable Transition<? super Bitmap> transition) {
-                        imageView.setImageBitmap(resource);
+                        if (img == imageView.getTag(R.id.imageid))
+                            imageView.setImageBitmap(resource);
                     }
 
                     @Override
@@ -618,30 +650,6 @@ public class Utils {
     }
 
     /**
-     * 发现新版本弹窗
-     * @param context
-     * @param version
-     * @param body
-     * @param posListener
-     * @param negListener
-     */
-    public static void findNewVersion(Context context,
-                                      String version,
-                                      String body,
-                                      DialogInterface.OnClickListener posListener,
-                                      DialogInterface.OnClickListener negListener) {
-        AlertDialog alertDialog;
-        AlertDialog.Builder builder = new AlertDialog.Builder(context, R.style.DialogStyle);
-        builder.setMessage(body);
-        builder.setTitle(getString(R.string.find_new_version) + version);
-        builder.setPositiveButton(getString(R.string.update_now), posListener);
-        builder.setNegativeButton(getString(R.string.update_after), negListener);
-        builder.setCancelable(false);
-        alertDialog = builder.create();
-        alertDialog.show();
-    }
-
-    /**
      * 判断是否有NavigationBar
      *
      * @param activity
@@ -676,6 +684,7 @@ public class Utils {
         if (resourceId > 0 && checkHasNavigationBar(activity)) {
             result = resources.getDimensionPixelSize(resourceId);
         }
+        Log.e("getNavigationBarHeight", result + "");
         return result + 15;
     }
 
@@ -910,5 +919,112 @@ public class Utils {
      */
     public static boolean getTheme() {
         return (boolean) SharedPreferencesUtils.getParam(getContext(), "darkTheme", false);
+    }
+
+    public static void fadeIn( View view) {
+        if (view.getVisibility() == View.VISIBLE) {
+            return;
+        }
+        Animation animation = new AlphaAnimation(0F, 1F);
+        animation.setDuration(800);
+        animation.setAnimationListener(new Animation.AnimationListener() {
+            @Override
+            public void onAnimationStart(Animation animation) {
+            }
+            @Override
+            public void onAnimationEnd(Animation animation) {
+                view.setEnabled(true);
+            }
+            @Override
+            public void onAnimationRepeat(Animation animation) {
+            }
+        });
+        view.startAnimation(animation);
+        view.setVisibility(View.VISIBLE);
+    }
+
+    public static void fadeOut(final View view) {
+        if (view.getVisibility() != View.VISIBLE) {
+            return;
+        }
+        view.setEnabled(false);
+        Animation animation = new AlphaAnimation(1F, 0F);
+        animation.setDuration(800);
+        animation.setAnimationListener(new Animation.AnimationListener() {
+            @Override
+            public void onAnimationStart(Animation animation) {
+            }
+            @Override
+            public void onAnimationEnd(Animation animation) {
+                view.setVisibility(View.GONE);
+            }
+            @Override
+            public void onAnimationRepeat(Animation animation) {
+            }
+        });
+        view.startAnimation(animation);
+    }
+
+    public static int getNavigationBarHeight() {
+        float result = 0;
+        int resourceId = context.getResources().getIdentifier("navigation_bar_height", "dimen", "android");
+        if (resourceId > 0) {
+            result = context.getResources().getDimension(resourceId);
+        }
+        return (int) result;
+    }
+
+    /**
+     * 统一处理弹出窗
+     * @param context
+     * @param title
+     * @param msg
+     * @param cancelable
+     * @param positiveButtonTitle
+     * @param negativeButtonTitle
+     * @param neutralButtonTitle
+     * @param positiveButtonListener
+     * @param negativeButtonListener
+     * @param neutralButtonListener
+     */
+    public static void showAlert(@NotNull Context context,
+                                 @NotNull String title, @NotNull String msg, boolean cancelable,
+                                 String positiveButtonTitle,
+                                 String negativeButtonTitle,
+                                 String neutralButtonTitle,
+                                 DialogInterface.OnClickListener positiveButtonListener,
+                                 DialogInterface.OnClickListener negativeButtonListener,
+                                 DialogInterface.OnClickListener neutralButtonListener) {
+        AlertDialog alertDialog;
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(context, R.style.DialogStyle);
+        if (positiveButtonTitle != null && !positiveButtonTitle.isEmpty())
+            builder.setPositiveButton(positiveButtonTitle, positiveButtonListener);
+        if (negativeButtonTitle != null && !negativeButtonTitle.isEmpty())
+            builder.setNegativeButton(negativeButtonTitle, negativeButtonListener);
+        if (neutralButtonTitle != null && !neutralButtonTitle.isEmpty())
+            builder.setNeutralButton(neutralButtonTitle, neutralButtonListener);
+        builder.setCancelable(cancelable);
+        builder.setMessage(msg);
+        builder.setTitle(title);
+        alertDialog = builder.create();
+        alertDialog.show();
+    }
+
+    /**
+     * 单选弹出窗统一处理
+     * @param context
+     * @param title
+     * @param items
+     * @param cancelable
+     * @param defaultChoice
+     * @param listener
+     */
+    public static void showSingleChoiceAlert(@NotNull Context context, @NotNull String title, @NotNull String[] items, boolean cancelable, int defaultChoice, @Nullable DialogInterface.OnClickListener listener) {
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(context, R.style.DialogStyle);
+        builder.setTitle(title);
+        builder.setSingleChoiceItems(items, defaultChoice, listener);
+        builder.setCancelable(cancelable);
+        AlertDialog alertDialog = builder.create();
+        alertDialog.show();
     }
 }

@@ -2,7 +2,6 @@ package my.project.sakuraproject.main.week;
 
 import android.annotation.SuppressLint;
 import android.content.Intent;
-import android.content.res.Configuration;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -25,7 +24,7 @@ import butterknife.BindView;
 import butterknife.ButterKnife;
 import butterknife.Unbinder;
 import my.project.sakuraproject.R;
-import my.project.sakuraproject.adapter.FragmentAdapter;
+import my.project.sakuraproject.adapter.WeekAdapter;
 import my.project.sakuraproject.application.Sakura;
 import my.project.sakuraproject.bean.HomeWekBean;
 import my.project.sakuraproject.main.base.LazyFragment;
@@ -38,7 +37,7 @@ public class WeekFragment extends LazyFragment {
     RecyclerView recyclerView;
     @BindView(R.id.loading)
     ProgressBar loading;
-    protected FragmentAdapter adapter;
+    protected WeekAdapter adapter;
     private List<HomeWekBean> list = new ArrayList<>();
     private Sakura application;
     private View view;
@@ -78,8 +77,7 @@ public class WeekFragment extends LazyFragment {
     public void initAdapter() {
         if (adapter == null) {
 //            recyclerView.setLayoutManager(new GridLayoutManager(getActivity(), Utils.isPad() ? 4 : 2));
-            adapter = new FragmentAdapter(getActivity(), list);
-            adapter.openLoadAnimation();
+            adapter = new WeekAdapter(getActivity(), list);
             adapter.openLoadAnimation(BaseQuickAdapter.ALPHAIN);
             adapter.setOnItemClickListener((adapter, view, position) -> {
                 if (!Utils.isFastClick()) return;
@@ -98,6 +96,7 @@ public class WeekFragment extends LazyFragment {
 //                }
 //            });
             recyclerView.setAdapter(adapter);
+            setRecyclerViewView();
         }
     }
 
@@ -105,9 +104,9 @@ public class WeekFragment extends LazyFragment {
         loading.setVisibility(View.GONE);
         if (adapter.getData().isEmpty()) {
             list = getList(week);
-            setRecyclerViewView();
             if (list.size() == 0) {
                 if (!application.error.isEmpty()) {
+                    setRecyclerViewEmpty();
                     errorTitle.setText(application.error);
                     adapter.setEmptyView(errorView);
                 }
@@ -146,29 +145,30 @@ public class WeekFragment extends LazyFragment {
     @Override
     public void onResume() {
         super.onResume();
-//        setRecyclerViewView();
-    }
-
-    @Override
-    public void onConfigurationChanged(Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
         setRecyclerViewView();
     }
 
+    @Override
+    protected void setConfigurationChanged() {
+        setRecyclerViewView();
+    }
+
+    private void setRecyclerViewEmpty() {
+        recyclerView.setLayoutManager(new GridLayoutManager(getActivity(), 1));
+    }
+
     private void setRecyclerViewView() {
+        position = recyclerView.getLayoutManager() == null ? 0 : ((GridLayoutManager) recyclerView.getLayoutManager()).findFirstVisibleItemPosition();
         String config = getActivity().getResources().getConfiguration().toString();
         boolean isInMagicWindow = config.contains("miui-magic-windows");
-        if (list.size() == 0) {
-            recyclerView.setLayoutManager(new GridLayoutManager(getActivity(), 1));
-            return;
-        }
         if (!Utils.isPad())
-            recyclerView.setLayoutManager(new GridLayoutManager(getActivity(), 2));
+            recyclerView.setLayoutManager(new GridLayoutManager(getActivity(), isPortrait ? 2 : 3));
         else {
-            if (isInMagicWindow) {
+            if (isInMagicWindow)
                 recyclerView.setLayoutManager(new GridLayoutManager(getActivity(), 3));
-            } else
-                recyclerView.setLayoutManager(new GridLayoutManager(getActivity(), 4));
+            else
+                recyclerView.setLayoutManager(new GridLayoutManager(getActivity(), isPortrait ? 4 : 6));
         }
+        recyclerView.getLayoutManager().scrollToPosition(position);
     }
 }

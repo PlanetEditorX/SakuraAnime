@@ -1,7 +1,6 @@
 package my.project.sakuraproject.main.my.fragment;
 
 import android.content.Intent;
-import android.content.res.Configuration;
 import android.os.Bundle;
 import android.os.Handler;
 import android.view.LayoutInflater;
@@ -10,11 +9,12 @@ import android.view.ViewGroup;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
-import com.alibaba.fastjson.JSONObject;
 import com.arialyy.annotations.Download;
 import com.arialyy.aria.core.Aria;
 import com.arialyy.aria.core.download.DownloadEntity;
 import com.arialyy.aria.core.task.DownloadTask;
+import com.chad.library.adapter.base.BaseQuickAdapter;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
@@ -33,6 +33,7 @@ import my.project.sakuraproject.R;
 import my.project.sakuraproject.adapter.DownloadListAdapter;
 import my.project.sakuraproject.application.Sakura;
 import my.project.sakuraproject.bean.DownloadBean;
+import my.project.sakuraproject.bean.DownloadEvent;
 import my.project.sakuraproject.bean.Refresh;
 import my.project.sakuraproject.bean.UpdateImgBean;
 import my.project.sakuraproject.custom.CustomLoadMoreView;
@@ -47,6 +48,7 @@ import my.project.sakuraproject.main.my.UpdateImgPresenter;
 import my.project.sakuraproject.services.DownloadService;
 import my.project.sakuraproject.util.Utils;
 
+@Deprecated
 public class DownloadFragment extends MyLazyFragment<DownloadContract.View, DownloadPresenter> implements DownloadContract.View, UpdateImgContract.View {
     @BindView(R.id.rv_list)
     RecyclerView mRecyclerView;
@@ -99,6 +101,7 @@ public class DownloadFragment extends MyLazyFragment<DownloadContract.View, Down
 
     private void initAdapter() {
         adapter = new DownloadListAdapter(getActivity(), downloadList);
+        adapter.openLoadAnimation(BaseQuickAdapter.ALPHAIN);
         adapter.setOnItemClickListener((adapter, view, position) -> {
             if (!Utils.isFastClick()) return;
             Bundle bundle = new Bundle();
@@ -164,9 +167,10 @@ public class DownloadFragment extends MyLazyFragment<DownloadContract.View, Down
 
     @Download.onTaskRunning
     protected void running(DownloadTask downloadTask) {
-        JSONObject obj = JSONObject.parseObject(Aria.download(this).load(downloadTask.getEntity().getId()).getExtendField());
+//        JSONObject obj = JSONObject.parseObject(Aria.download(this).load(downloadTask.getEntity().getId()).getExtendField());
         for (int i = 0, size = downloadList.size(); i < size; i++) {
-            if (downloadList.get(i).getAnimeTitle().equals(obj.getString("title"))) {
+            String title = (String) DatabaseUtil.queryDownloadAnimeInfo(downloadTask.getEntity().getId()).get(0);
+            if (downloadList.get(i).getAnimeTitle().equals(title)) {
                 TextView number = (TextView) adapter.getViewByPosition(i, R.id.number);
                 if (number != null) {
                     String speed = downloadTask.getConvertSpeed() == null ? "0kb/s" : downloadTask.getConvertSpeed();
@@ -186,20 +190,22 @@ public class DownloadFragment extends MyLazyFragment<DownloadContract.View, Down
         }
     }
 
-    @Download.onTaskComplete
+    /*@Download.onTaskComplete
     public void onTaskComplete(DownloadTask downloadTask) {
-        JSONObject obj = JSONObject.parseObject(Aria.download(this).load(downloadTask.getEntity().getId()).getExtendField());
+//        JSONObject obj = JSONObject.parseObject(Aria.download(this).load(downloadTask.getEntity().getId()).getExtendField());
         new Handler().postDelayed(() -> {
             for (int i = 0, size = downloadList.size(); i < size; i++) {
-                if (downloadList.get(i).getAnimeTitle().equals(obj.getString("title"))) {
+                String title = (String) DatabaseUtil.queryDownloadAnimeInfo(downloadTask.getEntity().getId()).get(0);
+                if (downloadList.get(i).getAnimeTitle().equals(title)) {
                     downloadList.get(i).setFilesSize(DatabaseUtil.queryDownloadFilesSize(downloadList.get(i).getDownloadId()));
                     downloadList.get(i).setNoCompleteSize(DatabaseUtil.queryDownloadNotCompleteCount(downloadList.get(i).getDownloadId()));
                     adapter.notifyItemChanged(i);
+                    DatabaseUtil.updateDownloadSuccess((String) VideoUtils.getAnimeInfo(downloadTask, 0), (Integer) VideoUtils.getAnimeInfo(downloadTask, 1), downloadTask.getFilePath(), downloadTask.getEntity().getId(), downloadTask.getFileSize());
                     break;
                 }
             }
         }, 1000);
-    }
+    }*/
 
     @Override
     public void onDestroy() {
@@ -214,7 +220,10 @@ public class DownloadFragment extends MyLazyFragment<DownloadContract.View, Down
             if (isMain) {
                 loading.setVisibility(View.GONE);
                 downloadList = list;
-                setRecyclerViewView();
+                if (downloadList.size() > 0)
+                    setRecyclerViewView();
+                else
+                    setRecyclerViewEmpty();
                 adapter.setNewData(downloadList);
             } else
                 adapter.addData(list);
@@ -233,7 +242,7 @@ public class DownloadFragment extends MyLazyFragment<DownloadContract.View, Down
         setLoadState(false);
         getActivity().runOnUiThread(() -> {
             if (isMain) {
-                setRecyclerViewView();
+                setRecyclerViewEmpty();
                 loading.setVisibility(View.GONE);
                 errorTitle.setText(msg);
                 adapter.setEmptyView(errorView);
@@ -255,7 +264,7 @@ public class DownloadFragment extends MyLazyFragment<DownloadContract.View, Down
         List<DownloadEntity> list = Aria.download(this).getAllNotCompleteTask();
         if (list != null && list.size() > 0) {
             AlertDialog alertDialog;
-            AlertDialog.Builder builder = new AlertDialog.Builder(getActivity(), R.style.DialogStyle);
+            MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(getActivity(), R.style.DialogStyle);
             builder.setMessage(String.format("你有%s个未完成的下载任务，是否继续下载？", list.size()+""));
             builder.setPositiveButton(Utils.getString(R.string.download_positive), (dialog, which) -> getActivity().startService(new Intent(getContext(), DownloadService.class)));
             builder.setNegativeButton(Utils.getString(R.string.download_negative), (dialog, which) -> dialog.dismiss());
@@ -267,35 +276,28 @@ public class DownloadFragment extends MyLazyFragment<DownloadContract.View, Down
     }
 
     @Override
-    public void onResume() {
-        super.onResume();
-        if (isFragmentVisible && Utils.isPad())
-            setRecyclerViewView();
-    }
-
-    @Override
-    public void onConfigurationChanged(Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
+    protected void setConfigurationChanged() {
         setRecyclerViewView();
     }
 
+    private void setRecyclerViewEmpty() {
+        mRecyclerView.setLayoutManager(new GridLayoutManager(getActivity(), 1));
+    }
+
     private void setRecyclerViewView() {
+        position = mRecyclerView.getLayoutManager() == null ? 0 : ((GridLayoutManager) mRecyclerView.getLayoutManager()).findFirstVisibleItemPosition();
+
         String config = getActivity().getResources().getConfiguration().toString();
         boolean isInMagicWindow = config.contains("miui-magic-windows");
-        if (downloadList.size() == 0) {
-            mRecyclerView.setLayoutManager(new GridLayoutManager(getActivity(), 1));
-            return;
-        }
-        if (!Utils.isPad()) {
-            mRecyclerView.setLayoutManager(new GridLayoutManager(getActivity(), 1));
-        }
+        if (!Utils.isPad())
+            mRecyclerView.setLayoutManager(new GridLayoutManager(getActivity(), isPortrait ? 1 : 2));
         else {
-            if (isInMagicWindow) {
+            if (isInMagicWindow)
                 mRecyclerView.setLayoutManager(new GridLayoutManager(getActivity(), 1));
-            } else {
+            else
                 mRecyclerView.setLayoutManager(new GridLayoutManager(getActivity(), 2));
-            }
         }
+        mRecyclerView.getLayoutManager().scrollToPosition(position);
     }
 
     @Override
@@ -324,5 +326,19 @@ public class DownloadFragment extends MyLazyFragment<DownloadContract.View, Down
         if (!isFragmentVisible) return;
         updateImgPresenter = new UpdateImgPresenter(updateImgBean.getOldImgUrl(), updateImgBean.getDescUrl(), this);
         updateImgPresenter.loadData();
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onDownloadEvent(DownloadEvent downloadEvent) {
+        new Handler().postDelayed(() -> {
+            for (int i = 0, size = downloadList.size(); i < size; i++) {
+                if (downloadList.get(i).getAnimeTitle().equals(downloadEvent.getTitle())) {
+                    downloadList.get(i).setFilesSize(DatabaseUtil.queryDownloadFilesSize(downloadList.get(i).getDownloadId()));
+                    downloadList.get(i).setNoCompleteSize(DatabaseUtil.queryDownloadNotCompleteCount(downloadList.get(i).getDownloadId()));
+                    adapter.notifyItemChanged(i);
+                    break;
+                }
+            }
+        }, 1000);
     }
 }

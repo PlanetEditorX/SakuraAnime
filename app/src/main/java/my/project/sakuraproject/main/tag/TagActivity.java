@@ -4,16 +4,15 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.TextView;
 
 import com.chad.library.adapter.base.BaseQuickAdapter;
-import com.chad.library.adapter.base.entity.MultiItemEntity;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
-import com.r0adkll.slidr.Slidr;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
+import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,7 +25,7 @@ import butterknife.BindView;
 import butterknife.OnClick;
 import my.project.sakuraproject.R;
 import my.project.sakuraproject.adapter.AnimeListAdapter;
-import my.project.sakuraproject.adapter.TagAdapter;
+import my.project.sakuraproject.application.Sakura;
 import my.project.sakuraproject.bean.AnimeListBean;
 import my.project.sakuraproject.bean.TagBean;
 import my.project.sakuraproject.custom.CustomLoadMoreView;
@@ -35,7 +34,6 @@ import my.project.sakuraproject.main.animeList.AnimeListContract;
 import my.project.sakuraproject.main.animeList.AnimeListPresenter;
 import my.project.sakuraproject.main.base.BaseActivity;
 import my.project.sakuraproject.main.desc.DescActivity;
-import my.project.sakuraproject.util.SwipeBackLayoutUtil;
 import my.project.sakuraproject.util.Utils;
 
 public class TagActivity extends BaseActivity<TagContract.View, TagPresenter> implements TagContract.View, AnimeListContract.View {
@@ -45,25 +43,31 @@ public class TagActivity extends BaseActivity<TagContract.View, TagPresenter> im
     RecyclerView animeListRecyclerView;
     private AnimeListAdapter animeListAdapter;
     private List<AnimeListBean> animeLists = new ArrayList<>();
-    private TagAdapter tagAdapter;
     @BindView(R.id.mSwipe)
     SwipeRefreshLayout mSwipe;
-    private List<MultiItemEntity> tagList = new ArrayList<>();
-    private RecyclerView tagRecyclerView;
-    private BottomSheetDialog mBottomSheetDialog;
-    private MaterialButton ref;
-    @BindView(R.id.tag_btn)
-    FloatingActionButton tag_btn;
     private AnimeListPresenter animeListPresenter;
     private String animeUrl = "";
+    private String tagUrl = "";
+    private String title = "";
+    private String[] siliParams;
+    private List<String> siliTagParams = new ArrayList<>();
+    private List<String> siliTagSubTitle = new ArrayList<>();
+    private String toolbarSubTitle;
     private int nowPage = 1;
     private int pageCount = 1;
     private boolean isErr = true;
-    private String title = "";
+    // TAG
+    private List<TagBean> tagBeans = new ArrayList<>();
+    @BindView(R.id.chip_group)
+    ChipGroup tagGroup;
+    private BottomSheetDialog tagDialog;
+    private ChipGroup itemChipsView;
+    @BindView(R.id.ref_btn)
+    MaterialButton refBtn;
 
     @Override
     protected TagPresenter createPresenter() {
-        return new TagPresenter(this);
+        return new TagPresenter(Utils.isImomoe() ? tagUrl : Sakura.TAG_API, siliParams, this);
     }
 
     @Override
@@ -78,24 +82,25 @@ public class TagActivity extends BaseActivity<TagContract.View, TagPresenter> im
 
     @Override
     protected void init() {
-        Slidr.attach(this, Utils.defaultInit());
+//        Slidr.attach(this, Utils.defaultInit());
         getBundle();
         initToolbar();
-        initFab();
         initSwipe();
         initAdapter();
     }
 
     @Override
     protected void initBeforeView() {
-        SwipeBackLayoutUtil.convertActivityToTranslucent(this);
+//        SwipeBackLayoutUtil.convertActivityToTranslucent(this);
     }
 
     public void getBundle() {
         Bundle bundle = getIntent().getExtras();
         if (null != bundle && !bundle.isEmpty()) {
-            animeUrl = bundle.getString("url");
+            animeUrl = bundle.getString("url") == null ? "" : bundle.getString("url");
+            tagUrl = bundle.getString("tagUrl") == null ? "" : bundle.getString("tagUrl");
             title = bundle.getString("title");
+            siliParams = bundle.getStringArray("siliParams");
         }
 
     }
@@ -107,17 +112,6 @@ public class TagActivity extends BaseActivity<TagContract.View, TagPresenter> im
         toolbar.setNavigationOnClickListener(view -> finish());
     }
 
-    public void initFab() {
-        if (Utils.checkHasNavigationBar(this)) {
-            ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) tag_btn.getLayoutParams();
-            params.setMargins(Utils.dpToPx(this, 16),
-                    Utils.dpToPx(this, 16),
-                    Utils.dpToPx(this, 16),
-                    Utils.getNavigationBarHeight(this) + 15);
-            tag_btn.setLayoutParams(params);
-        }
-    }
-
     public void initSwipe() {
         mSwipe.setEnabled(false);
         mSwipe.setColorSchemeResources(R.color.pink500, R.color.blue500, R.color.purple500);
@@ -125,8 +119,8 @@ public class TagActivity extends BaseActivity<TagContract.View, TagPresenter> im
             animeLists.clear();
             animeListAdapter.setNewData(animeLists);
             nowPage = 1;
-            animeListPresenter = new AnimeListPresenter(animeUrl, nowPage, this);
-            animeListPresenter.loadData(true, false, Utils.isImomoe());
+            animeListPresenter = new AnimeListPresenter(Utils.isImomoe() ? tagUrl : animeUrl, siliTagParams, nowPage, this);
+            animeListPresenter.loadData(true, false, Utils.isImomoe(), false);
         });
     }
 
@@ -155,8 +149,8 @@ public class TagActivity extends BaseActivity<TagContract.View, TagPresenter> im
                 if (isErr) {
                     //成功获取更多数据
                     nowPage++;
-                    animeListPresenter = new AnimeListPresenter(animeUrl, nowPage, this);
-                    animeListPresenter.loadData(false, false, Utils.isImomoe());
+                    animeListPresenter = new AnimeListPresenter(Utils.isImomoe() ? tagUrl : animeUrl, siliTagParams, nowPage, this);
+                    animeListPresenter.loadData(false, false, Utils.isImomoe(), false);
                 } else {
                     //获取更多数据失败
                     isErr = true;
@@ -165,49 +159,6 @@ public class TagActivity extends BaseActivity<TagContract.View, TagPresenter> im
             }
         }, 500), animeListRecyclerView);
         animeListRecyclerView.setAdapter(animeListAdapter);
-        // 分类数据
-        View tagView = LayoutInflater.from(this).inflate(R.layout.dialog_tag, null);
-        tagRecyclerView = tagView.findViewById(R.id.tag_list);
-        ref = tagView.findViewById(R.id.ref);
-        ref.setOnClickListener((view)-> {
-            mBottomSheetDialog.dismiss();
-            tagList.clear();
-            tagAdapter.setNewData(tagList);
-            mPresenter = createPresenter();
-            mPresenter.loadData(true);
-        });
-        tagAdapter = new TagAdapter(this, tagList);
-        tagAdapter.setOnItemClickListener((adapter, view, position) -> {
-            if (!Utils.isFastClick()) return;
-            if (mSwipe.isRefreshing()) {
-//                Sakura.getInstance().showToastMsg(Utils.getString(R.string.loading_info));
-                CustomToast.showToast(this, Utils.getString(R.string.loading_info), CustomToast.WARNING);
-                return;
-            }
-            mBottomSheetDialog.dismiss();
-            TextView textView = (TextView) adapter.getViewByPosition(tagRecyclerView, position, R.id.tag_group);
-            textView.setTextColor(getResources().getColor(R.color.colorAccent));
-            final TagBean bean = (TagBean) adapter.getItem(position);
-            for (MultiItemEntity entity : tagList) {
-                if (entity.getItemType()  == TagAdapter.TYPE_LEVEL_1) {
-                    TagBean tagBean = (TagBean) entity;
-                    tagBean.setSelected(false);
-                }
-            }
-            bean.setSelected(true);
-            adapter.setNewData(tagList);
-            mSwipe.setEnabled(true);
-            toolbar.setTitle(bean.getTitle());
-            animeUrl = bean.getItemUrl();
-            animeListAdapter.setNewData(null);
-            animeListAdapter.setEmptyView(getLayoutInflater().inflate(R.layout.base_emnty_view, null));
-            nowPage = 1;
-            animeListPresenter = new AnimeListPresenter(animeUrl, nowPage, this);
-            animeListPresenter.loadData(true, false, Utils.isImomoe());
-        });
-        tagRecyclerView.setAdapter(tagAdapter);
-        mBottomSheetDialog = new BottomSheetDialog(this);
-        mBottomSheetDialog.setContentView(tagView);
     }
 
     public void setLoadState(boolean loadState) {
@@ -215,11 +166,11 @@ public class TagActivity extends BaseActivity<TagContract.View, TagPresenter> im
         animeListAdapter.loadMoreComplete();
     }
 
-    @OnClick(R.id.tag_btn)
-    public void tagBtnClick() {
-        tagAdapter.setNewData(tagList);
-        mBottomSheetDialog.getBehavior().setState(BottomSheetBehavior.STATE_EXPANDED);
-        mBottomSheetDialog.show();
+    @OnClick(R.id.ref_btn)
+    public void refBtnClick() {
+        refBtn.setVisibility(View.GONE);
+        mPresenter = createPresenter();
+        mPresenter.loadData(true);
     }
 
 
@@ -229,46 +180,179 @@ public class TagActivity extends BaseActivity<TagContract.View, TagPresenter> im
     }
 
     @Override
-    public void showSuccessView(List<MultiItemEntity> list) {
+    public void showTagSuccessView(boolean isSilisili, List<TagBean> list) {
         runOnUiThread(() -> {
             if (!mActivityFinish) {
-                ref.setVisibility(View.GONE);
+//                ref.setVisibility(View.GONE);
                 mSwipe.setRefreshing(false);
-                tagList = list;
-                setRecyclerViewView();
-                tagAdapter.setNewData(tagList);
-                tagAdapter.expandAll();
-                if (!animeUrl.isEmpty()) {
-                    animeListPresenter = new AnimeListPresenter(animeUrl, nowPage, this);
-                    animeListPresenter.loadData(true, false, Utils.isImomoe());
-                } else {
-                    mBottomSheetDialog.getBehavior().setState(BottomSheetBehavior.STATE_EXPANDED);
-                    mBottomSheetDialog.show();
+                tagBeans = list;
+                for (int i=0,size=tagBeans.size(); i<size; i++) {
+                    Chip chip = new Chip(this);
+                    chip.setText(tagBeans.get(i).getTitle());
+                    chip.setBackgroundColor(getResources().getColor(R.color.window_bg));
+                    chip.setTextColor(getResources().getColor(R.color.text_color_primary));
+                    chip.setChipStrokeColorResource(R.color.head);
+                    chip.setRippleColor(getResources().getColorStateList(R.color.ripple_color));
+                    int index = i;
+                    chip.setOnClickListener(view -> {
+                        if (isSilisili)
+                            openSiliSelectDialog(index);
+                        else
+                            openSelectDialog(index);
+                    });
+                    tagGroup.addView(chip);
                 }
-                tag_btn.show();
+                if (!animeUrl.isEmpty()) {
+                    animeListPresenter = new AnimeListPresenter(Utils.isImomoe() ? tagUrl : animeUrl, siliTagParams, nowPage, this);
+                    animeListPresenter.loadData(true, false, Utils.isImomoe(), false);
+                }
             }
         });
+    }
+
+    @Override
+    public void showDefaultSiliAnimeList(List<AnimeListBean> animeListBeans, int pageCount) {
+        runOnUiThread(() -> {
+            if (!mActivityFinish) {
+                toolbar.setSubtitle("[全部]");
+                this.pageCount = pageCount;
+                setRecyclerViewView();
+                animeLists = animeListBeans;
+                animeListAdapter.setNewData(animeLists);
+            }
+        });
+    }
+
+    private void openSelectDialog(int position) {
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_tag, null);
+        TextView textView = view.findViewById(R.id.title);
+        textView.setText(tagBeans.get(position).getTitle());
+        ExtendedFloatingActionButton button = view.findViewById(R.id.confirm);
+        itemChipsView = view.findViewById(R.id.chip_group);
+        for (TagBean.TagSelectBean tagSelectBean : tagBeans.get(position).getTagSelectBeans()) {
+            Chip singleChip = (Chip) LayoutInflater.from(this).inflate(R.layout.dialog_chip, null);
+            singleChip.setText(tagSelectBean.getTitle());
+            if (animeUrl.equals(tagSelectBean.getUrl()))
+                singleChip.setChecked(true);
+            singleChip.setOnCheckedChangeListener((compoundButton, b) -> {
+                String title = compoundButton.getText().toString();
+                if (b) {
+                    for (int i = 0; i < itemChipsView.getChildCount(); i++) {
+                        Chip chip1 = (Chip) itemChipsView.getChildAt(i);
+                        chip1.setChecked(chip1.getText().toString().equals(title));
+                    }
+                    for (TagBean tagBean : tagBeans) {
+                        for (TagBean.TagSelectBean selectBean : tagBean.getTagSelectBeans()) {
+                            if (selectBean.getTitle().equals(title)) {
+                                selectBean.setSelected(true);
+                                animeUrl = selectBean.getUrl();
+                                toolbarSubTitle = selectBean.getTitle();
+                            } else
+                                selectBean.setSelected(false);
+                        }
+                    }
+                } else {
+                    animeUrl = "";
+                    for (int i=0,size=tagBeans.get(position).getTagSelectBeans().size(); i<size; i++) {
+                        tagBeans.get(position).getTagSelectBeans().get(i).setSelected(false);
+                    }
+                }
+            });
+            itemChipsView.addView(singleChip);
+        }
+        tagDialog = new BottomSheetDialog(this);
+        tagDialog.setContentView(view);
+        button.setOnClickListener(view1 -> {
+            tagDialog.dismiss();
+            if (animeUrl.isEmpty())
+                return;
+            toolbar.setSubtitle(toolbarSubTitle);
+            animeLists.clear();
+            animeListAdapter.setNewData(null);
+            animeListAdapter.setEmptyView(getLayoutInflater().inflate(R.layout.base_emnty_view, null));
+            nowPage = 1;
+            animeListPresenter = new AnimeListPresenter(Utils.isImomoe() ? tagUrl : animeUrl, siliTagParams, nowPage, this);
+            animeListPresenter.loadData(true, false, Utils.isImomoe(), false);
+        });
+        tagDialog.getBehavior().setState(BottomSheetBehavior.STATE_EXPANDED);
+        tagDialog.show();
+    }
+
+    private void openSiliSelectDialog(int position) {
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_tag, null);
+        TextView textView = view.findViewById(R.id.title);
+        textView.setText(tagBeans.get(position).getTitle());
+        ExtendedFloatingActionButton button = view.findViewById(R.id.confirm);
+        itemChipsView = view.findViewById(R.id.chip_group);
+        for (TagBean.TagSelectBean tagSelectBean : tagBeans.get(position).getTagSelectBeans()) {
+            Chip singleChip = (Chip) LayoutInflater.from(this).inflate(R.layout.dialog_chip, null);
+            singleChip.setText(tagSelectBean.getTitle());
+            if (siliTagParams.contains(tagSelectBean.getUrl()))
+                singleChip.setChecked(true);
+            singleChip.setOnCheckedChangeListener((compoundButton, b) -> {
+                String title = compoundButton.getText().toString();
+                if (b) {
+                    for (int i = 0; i < itemChipsView.getChildCount(); i++) {
+                        Chip chip1 = (Chip) itemChipsView.getChildAt(i);
+                        chip1.setChecked(chip1.getText().toString().equals(title));
+                    }
+                    for (TagBean.TagSelectBean selectBean : tagBeans.get(position).getTagSelectBeans()) {
+                        if (selectBean.getTitle().equals(title)) {
+                            selectBean.setSelected(true);
+                            toolbarSubTitle = selectBean.getTitle();
+                            siliTagParams.add(selectBean.getUrl());
+                            siliTagSubTitle.add(selectBean.getTitle());
+                        } else {
+                            if (siliTagParams.contains(selectBean.getUrl())) {
+                                siliTagParams.remove(selectBean.getUrl());
+                                siliTagSubTitle.remove(selectBean.getTitle());
+                            }
+                            selectBean.setSelected(false);
+                        }
+                    }
+                } else {
+                    for (int i=0,size=tagBeans.get(position).getTagSelectBeans().size(); i<size; i++) {
+                        tagBeans.get(position).getTagSelectBeans().get(i).setSelected(false);
+                        TagBean.TagSelectBean checkedBean = tagBeans.get(position).getTagSelectBeans().get(i);
+                        if (siliTagParams.contains(checkedBean.getUrl())) {
+                            siliTagParams.remove(checkedBean.getUrl());
+                            siliTagSubTitle.remove(checkedBean.getTagTitle());
+                        }
+                    }
+                }
+            });
+            itemChipsView.addView(singleChip);
+        }
+        tagDialog = new BottomSheetDialog(this);
+        tagDialog.setContentView(view);
+        button.setOnClickListener(view1 -> {
+            tagDialog.dismiss();
+            toolbar.setSubtitle(siliTagSubTitle.size() > 0 ? siliTagSubTitle.toString() : "[全部]");
+            animeLists.clear();
+            animeListAdapter.setNewData(null);
+            animeListAdapter.setEmptyView(getLayoutInflater().inflate(R.layout.base_emnty_view, null));
+            nowPage = 1;
+            animeListPresenter = new AnimeListPresenter(Utils.isImomoe() ? tagUrl : animeUrl, siliTagParams, nowPage, this);
+            animeListPresenter.loadData(true, false, Utils.isImomoe(), false);
+        });
+        tagDialog.getBehavior().setState(BottomSheetBehavior.STATE_EXPANDED);
+        tagDialog.show();
     }
 
     @Override
     public void showLoadErrorView(String msg) {
         runOnUiThread(() -> {
             if (!mActivityFinish) {
-                ref.setVisibility(View.VISIBLE);
-                setRecyclerViewView();
+//                ref.setVisibility(View.VISIBLE);
+                setRecyclerViewEmpty();
                 mSwipe.setRefreshing(false);
-                errorTitle.setText(msg);
-                tagAdapter.setEmptyView(errorView);
-                mBottomSheetDialog.getBehavior().setState(BottomSheetBehavior.STATE_EXPANDED);
-                mBottomSheetDialog.show();
-                tag_btn.show();
+                refBtn.setVisibility(View.VISIBLE);
             }
         });
     }
 
     @Override
     public void showEmptyVIew() {
-        tagAdapter.setEmptyView(emptyView);
     }
 
     @Override
@@ -281,9 +365,9 @@ public class TagActivity extends BaseActivity<TagContract.View, TagPresenter> im
         runOnUiThread(() -> {
             if (!mActivityFinish) {
                 if (isMain) {
+                    setRecyclerViewView();
                     mSwipe.setRefreshing(false);
                     animeLists = animeList;
-                    setRecyclerViewView();
                     animeListAdapter.setNewData(animeLists);
                 } else {
                     animeListAdapter.addData(animeList);
@@ -298,7 +382,7 @@ public class TagActivity extends BaseActivity<TagContract.View, TagPresenter> im
         runOnUiThread(() -> {
             if (!mActivityFinish) {
                 if (isMain) {
-                    setRecyclerViewView();
+                    setRecyclerViewEmpty();
                     mSwipe.setRefreshing(false);
                     errorTitle.setText(msg);
                     animeListAdapter.setEmptyView(errorView);
@@ -319,7 +403,7 @@ public class TagActivity extends BaseActivity<TagContract.View, TagPresenter> im
     @Override
     public void onResume() {
         super.onResume();
-        if (Utils.isPad()) setRecyclerViewView();
+        setRecyclerViewView();
     }
 
     @Override
@@ -327,40 +411,24 @@ public class TagActivity extends BaseActivity<TagContract.View, TagPresenter> im
         setRecyclerViewView();
     }
 
+    private void setRecyclerViewEmpty() {
+        animeListRecyclerView.setLayoutManager(new GridLayoutManager(this, 1));
+    }
+
     private void setRecyclerViewView() {
+        position = animeListRecyclerView.getLayoutManager() == null ? 0 : ((GridLayoutManager) animeListRecyclerView.getLayoutManager()).findFirstVisibleItemPosition();
         String config = this.getResources().getConfiguration().toString();
         boolean isInMagicWindow = config.contains("miui-magic-windows");
-        if (tagList.size() == 0) {
-            tagRecyclerView.setLayoutManager(new GridLayoutManager(this, 1));
-            return;
-        }
         if (!Utils.isPad()) {
-            final GridLayoutManager manager = new GridLayoutManager(this,8);
-            manager.setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup() {
-                @Override
-                public int getSpanSize(int position) {
-                    return tagAdapter.getItemViewType(position) == TagAdapter.TYPE_LEVEL_1 ? 1 : manager.getSpanCount();
-                }
-            });
-            // important! setLayoutManager should be called after setAdapter
-            tagRecyclerView.setLayoutManager(manager);
-            animeListRecyclerView.setLayoutManager(new GridLayoutManager(this, animeLists.size() == 0 ? 1 : 3));
+            animeListRecyclerView.setLayoutManager(new GridLayoutManager(this, isPortrait ? 3 : 5));
         }
         else {
             if (isInMagicWindow) {
-                animeListRecyclerView.setLayoutManager(new GridLayoutManager(this, animeLists.size() == 0 ? 1 : 4));
+                animeListRecyclerView.setLayoutManager(new GridLayoutManager(this, 4));
             } else {
-                animeListRecyclerView.setLayoutManager(new GridLayoutManager(this, animeLists.size() == 0 ? 1 : 5));
+                animeListRecyclerView.setLayoutManager(new GridLayoutManager(this, isPortrait ? 5 : 8));
             }
-            final GridLayoutManager manager = new GridLayoutManager(this,12);
-            manager.setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup() {
-                @Override
-                public int getSpanSize(int position) {
-                    return tagAdapter.getItemViewType(position) == TagAdapter.TYPE_LEVEL_1 ? 1 : manager.getSpanCount();
-                }
-            });
-            // important! setLayoutManager should be called after setAdapter
-            tagRecyclerView.setLayoutManager(manager);
         }
+        animeListRecyclerView.getLayoutManager().scrollToPosition(position);
     }
 }

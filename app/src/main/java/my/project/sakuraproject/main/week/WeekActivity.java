@@ -1,8 +1,6 @@
 package my.project.sakuraproject.main.week;
 
 import com.google.android.material.tabs.TabLayout;
-import com.r0adkll.slidr.Slidr;
-import com.r0adkll.slidr.model.SlidrInterface;
 
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
@@ -18,7 +16,7 @@ import androidx.fragment.app.FragmentTransaction;
 import androidx.viewpager.widget.ViewPager;
 import butterknife.BindView;
 import my.project.sakuraproject.R;
-import my.project.sakuraproject.adapter.WeekAdapter;
+import my.project.sakuraproject.adapter.WeekFragmentAdapter;
 import my.project.sakuraproject.application.Sakura;
 import my.project.sakuraproject.bean.AnimeUpdateInfoBean;
 import my.project.sakuraproject.bean.HomeBean;
@@ -29,7 +27,6 @@ import my.project.sakuraproject.main.base.BaseActivity;
 import my.project.sakuraproject.main.home.HomeContract;
 import my.project.sakuraproject.main.home.HomePresenter;
 import my.project.sakuraproject.util.SharedPreferencesUtils;
-import my.project.sakuraproject.util.SwipeBackLayoutUtil;
 import my.project.sakuraproject.util.Utils;
 
 public class WeekActivity extends BaseActivity<HomeContract.View, HomePresenter> implements HomeContract.View {
@@ -41,14 +38,14 @@ public class WeekActivity extends BaseActivity<HomeContract.View, HomePresenter>
     TabLayout tab;
     @BindView(R.id.viewpager)
     ViewPager viewpager;
-    private WeekAdapter adapter;
+    private WeekFragmentAdapter adapter;
     private int week;
     private String[] tabs = Utils.getArray(R.array.week_array);
     private int[][] states = new int[][]{
             new int[]{-android.R.attr.state_checked},
             new int[]{android.R.attr.state_checked}
     };
-    private SlidrInterface slidrInterface;
+//    private SlidrInterface slidrInterface;
 
     @Override
     protected HomePresenter createPresenter() {
@@ -67,7 +64,7 @@ public class WeekActivity extends BaseActivity<HomeContract.View, HomePresenter>
 
     @Override
     protected void init() {
-        slidrInterface = Slidr.attach(this, Utils.defaultInit());
+//        slidrInterface = Slidr.attach(this, Utils.defaultInit());
         initToolbar();
         initSwipe();
         initFragment();
@@ -75,7 +72,7 @@ public class WeekActivity extends BaseActivity<HomeContract.View, HomePresenter>
 
     @Override
     protected void initBeforeView() {
-        SwipeBackLayoutUtil.convertActivityToTranslucent(this);
+//        SwipeBackLayoutUtil.convertActivityToTranslucent(this);
     }
 
     public void initToolbar() {
@@ -90,7 +87,7 @@ public class WeekActivity extends BaseActivity<HomeContract.View, HomePresenter>
         mSwipe.setOnRefreshListener(() -> {
             viewpager.removeAllViews();
             removeFragmentTransaction();
-            mPresenter.loadData(true);
+            loadData();
         });
     }
 
@@ -107,7 +104,15 @@ public class WeekActivity extends BaseActivity<HomeContract.View, HomePresenter>
         tab.getTabAt(week).select();
         tab.setSelectedTabIndicatorColor(getResources().getColor(R.color.pinka200));
         if (Boolean.parseBoolean(SharedPreferencesUtils.getParam(Sakura.getInstance(), "show_x5_info", true).toString()))
-            Utils.showX5Info(this);
+            Utils.showAlert(this,
+                    getString(R.string.x5_info_title),
+                    getString(R.string.x5_info),
+                    false,
+                    getString(R.string.x5_info_positive),
+                    null, null, (dialogInterface, i) ->{
+                        SharedPreferencesUtils.setParam(this, "show_x5_info", false);
+                        dialogInterface.dismiss();
+                    } , null, null);
     }
 
     @Override
@@ -160,7 +165,7 @@ public class WeekActivity extends BaseActivity<HomeContract.View, HomePresenter>
     }
 
     public void setWeekAdapter(int pos) {
-        adapter = new WeekAdapter(getSupportFragmentManager(), tab.getTabCount());
+        adapter = new WeekFragmentAdapter(getSupportFragmentManager(), tab.getTabCount());
         try {
             Field field = ViewPager.class.getDeclaredField("mRestoredCurItem");
             field.setAccessible(true);
@@ -176,7 +181,7 @@ public class WeekActivity extends BaseActivity<HomeContract.View, HomePresenter>
         viewpager.addOnPageChangeListener(new ViewPager.OnPageChangeListener() {
             @Override
             public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
-                enableSliding(position == 0);
+//                enableSliding(position == 0);
             }
 
             @Override
@@ -191,13 +196,13 @@ public class WeekActivity extends BaseActivity<HomeContract.View, HomePresenter>
         });
     }
 
-    private void enableSliding(boolean enable){
+    /*private void enableSliding(boolean enable){
         if (Utils.getSlidrConfig()) return;
         if (enable)
             slidrInterface.unlock();
         else
             slidrInterface.lock();
-    }
+    }*/
 
     public void removeFragmentTransaction() {
         try {//避免重启太快恢复

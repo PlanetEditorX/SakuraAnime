@@ -1,8 +1,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="my.project.sakuraproject">
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <!-- Required only if your app targets Android 13. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
@@ -21,6 +28,7 @@
         android:supportsRtl="true"
         android:requestLegacyExternalStorage = "true"
         android:theme="@style/AppTheme"
+        android:allowNativeHeapPointerTagging="false"
         android:usesCleartextTraffic="true">
         <meta-data
             android:name="EasyGoClient"
@@ -29,8 +37,8 @@
             android:name=".main.start.StartActivity"
             android:configChanges="screenLayout|orientation|screenSize|smallestScreenSize|keyboardHidden|uiMode"
             android:label="@string/app_name"
-            android:screenOrientation="portrait"
-            android:theme="@style/startTheme">
+            android:exported="true"
+            android:theme="@style/Theme.TestSplashScreen.Starting">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -43,34 +51,50 @@
         <activity
             android:name=".main.home.HomeActivity"
             android:configChanges="screenLayout|orientation|screenSize|smallestScreenSize|keyboardHidden|uiMode"
-            android:screenOrientation="portrait"
+            
             android:theme="@style/AppTheme.NoActionBar" />
+
+        <activity
+            android:name=".main.home.MainActivity"
+            android:configChanges="screenLayout|orientation|screenSize|smallestScreenSize|keyboardHidden|uiMode"
+
+            android:theme="@style/AppTheme.NoActionBar" />
+
+        <activity
+            android:name=".main.my.FavoriteActivity"
+            android:configChanges="screenLayout|orientation|screenSize|smallestScreenSize|keyboardHidden|uiMode"
+
+            android:theme="@style/TranslucentTheme" />
+
+        <activity
+            android:name=".main.my.HistoryActivity"
+            android:configChanges="screenLayout|orientation|screenSize|smallestScreenSize|keyboardHidden|uiMode"
+
+            android:theme="@style/TranslucentTheme" />
+
+        <activity
+            android:name=".main.my.DownloadActivity"
+            android:configChanges="screenLayout|orientation|screenSize|smallestScreenSize|keyboardHidden|uiMode"
+
+            android:theme="@style/TranslucentTheme" />
+
         <activity
             android:name=".main.week.WeekActivity"
             android:configChanges="screenLayout|orientation|screenSize|smallestScreenSize|keyboardHidden|uiMode"
-            android:screenOrientation="portrait"
+            
             android:theme="@style/TranslucentTheme" />
         <activity
             android:name=".main.updateList.UpdateListActivity"
             android:configChanges="screenLayout|orientation|screenSize|smallestScreenSize|keyboardHidden|uiMode"
-            android:screenOrientation="portrait"
+            
             android:theme="@style/TranslucentTheme" />
         <activity
             android:name=".main.desc.DescActivity"
             android:configChanges="screenLayout|orientation|screenSize|smallestScreenSize|keyboardHidden|uiMode"
-            android:screenOrientation="portrait"
+            
             android:theme="@style/TranslucentTheme" />
         <activity
             android:name=".main.player.PlayerActivity"
-            android:configChanges="screenLayout|orientation|screenSize|smallestScreenSize|keyboardHidden|uiMode"
-            android:excludeFromRecents="true"
-            android:resizeableActivity="true"
-            android:launchMode="singleTask"
-            android:supportsPictureInPicture="true"
-            android:screenOrientation="sensorLandscape"
-            android:theme="@style/AppTheme.FullScreenTheme" />
-        <activity
-            android:name=".main.player.ImomoePlayerActivity"
             android:configChanges="screenLayout|orientation|screenSize|smallestScreenSize|keyboardHidden|uiMode"
             android:excludeFromRecents="true"
             android:resizeableActivity="true"
@@ -91,52 +115,58 @@
             android:name=".main.webview.normal.DefaultNormalWebActivity"
             android:configChanges="screenLayout|orientation|screenSize|smallestScreenSize|keyboardHidden|uiMode"
             android:hardwareAccelerated="true"
-            android:screenOrientation="portrait"
-            android:theme="@style/AppTheme" />
+            
+            android:theme="@style/TranslucentTheme" />
         <activity
             android:name=".main.tag.TagActivity"
             android:configChanges="screenLayout|orientation|screenSize|smallestScreenSize|keyboardHidden|uiMode"
-            android:screenOrientation="portrait"
+            
             android:theme="@style/TranslucentTheme" />
         <activity
             android:name=".main.animeList.AnimeListActivity"
             android:configChanges="screenLayout|orientation|screenSize|smallestScreenSize|keyboardHidden|uiMode"
-            android:screenOrientation="portrait"
+            
             android:theme="@style/TranslucentTheme" />
         <activity
             android:name=".main.animeTopic.AnimeTopicActivity"
             android:configChanges="screenLayout|orientation|screenSize|smallestScreenSize|keyboardHidden|uiMode"
-            android:screenOrientation="portrait"
+            
             android:theme="@style/TranslucentTheme" />
         <activity
             android:name=".main.search.SearchActivity"
             android:configChanges="screenLayout|orientation|screenSize|smallestScreenSize|keyboardHidden|uiMode"
-            android:screenOrientation="portrait"
+            
             android:theme="@style/TranslucentTheme" />
         <activity
             android:name=".main.my.MyActivity"
             android:configChanges="screenLayout|orientation|screenSize|smallestScreenSize|keyboardHidden|uiMode"
-            android:screenOrientation="portrait"
+            
             android:theme="@style/TranslucentTheme" />
         <activity
             android:name=".main.my.DownloadDataActivity"
             android:configChanges="screenLayout|orientation|screenSize|smallestScreenSize|keyboardHidden|uiMode"
-            android:screenOrientation="portrait"
+            
             android:theme="@style/TranslucentTheme" />
         <activity
             android:name=".main.setting.SettingActivity"
             android:configChanges="screenLayout|orientation|screenSize|smallestScreenSize|keyboardHidden|uiMode"
-            android:screenOrientation="portrait"
+            
             android:theme="@style/TranslucentTheme" />
         <activity
             android:name=".main.about.AboutActivity"
             android:configChanges="screenLayout|orientation|screenSize|smallestScreenSize|keyboardHidden|uiMode"
-            android:screenOrientation="portrait"
+            
             android:theme="@style/TranslucentTheme" />
         <activity
             android:name=".main.about.OpenSourceActivity"
             android:configChanges="screenLayout|orientation|screenSize|smallestScreenSize|keyboardHidden|uiMode"
-            android:screenOrientation="portrait"
+            
+            android:theme="@style/TranslucentTheme" />
+
+        <activity
+            android:name=".main.rank.RankActivity"
+            android:configChanges="screenLayout|orientation|screenSize|smallestScreenSize|keyboardHidden|uiMode"
+
             android:theme="@style/TranslucentTheme" />
         <activity
             android:name=".cling.ui.DLNAActivity"

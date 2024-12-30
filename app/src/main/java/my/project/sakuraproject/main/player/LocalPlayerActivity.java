@@ -38,6 +38,7 @@ public class LocalPlayerActivity extends BasePlayerActivity {
     protected void initCustomData() {
         startService(new Intent(this, DLNAService.class));
         otherView.setVisibility(View.GONE);
+        player.snifferBtn.setVisibility(View.GONE);
     }
 
     @Override
@@ -85,8 +86,29 @@ public class LocalPlayerActivity extends BasePlayerActivity {
         return dramaAdapter.getItem(position);
     }
 
+
     @Override
     protected void changeVideo(String title) {
+
+    }
+
+    @Override
+    public void showLoadingView() {
+
+    }
+
+    @Override
+    public void showLoadErrorView(String msg) {
+
+    }
+
+    @Override
+    public void showEmptyVIew() {
+
+    }
+
+    @Override
+    public void showLog(String url) {
 
     }
 }

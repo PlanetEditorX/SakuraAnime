@@ -2,19 +2,22 @@ package my.project.sakuraproject.adapter;
 
 import android.content.Context;
 
+import androidx.annotation.Nullable;
+
 import com.chad.library.adapter.base.BaseQuickAdapter;
 import com.chad.library.adapter.base.BaseViewHolder;
 import com.google.android.material.button.MaterialButton;
 
 import java.util.List;
 
-import androidx.annotation.Nullable;
 import my.project.sakuraproject.R;
 import my.project.sakuraproject.bean.AnimeDescDetailsBean;
 
 /**
  * 播放列表适配器
+ * @deprecated 播放列表相同布局统一使用 {@link DramaAdapter}
  */
+@Deprecated
 public class AnimeDescDetailsAdapter extends BaseQuickAdapter<AnimeDescDetailsBean, BaseViewHolder> {
     private Context context;
 

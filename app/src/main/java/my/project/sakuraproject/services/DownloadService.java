@@ -3,11 +3,11 @@ package my.project.sakuraproject.services;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
-import android.os.Handler;
 import android.os.IBinder;
-import android.os.Looper;
 import android.os.PowerManager;
 import android.util.Log;
+
+import androidx.annotation.Nullable;
 
 import com.arialyy.annotations.Download;
 import com.arialyy.aria.core.Aria;
@@ -16,18 +16,20 @@ import com.arialyy.aria.core.task.DownloadTask;
 
 import org.greenrobot.eventbus.EventBus;
 
+import java.util.ArrayList;
 import java.util.List;
 
-import androidx.annotation.Nullable;
+import my.project.sakuraproject.bean.DownloadEvent;
 import my.project.sakuraproject.bean.Refresh;
-import my.project.sakuraproject.custom.CustomToast;
 import my.project.sakuraproject.database.DatabaseUtil;
 import my.project.sakuraproject.util.DownloadNotification;
+import my.project.sakuraproject.util.VideoUtils;
 
 public class DownloadService extends Service {
     private DownloadNotification mNotify;
-    private Handler handler;
+//    private Handler handler;
     PowerManager.WakeLock wakeLock = null;
+    private List<Long> taskIds = new ArrayList<>();
 
     @Nullable
     @Override
@@ -48,12 +50,10 @@ public class DownloadService extends Service {
         if (null != wakeLock)  {
             wakeLock.acquire();
         }
-        handler = new Handler(Looper.getMainLooper());
-        handler.post(() -> CustomToast.showToast(getApplicationContext(), "下载服务已开启", CustomToast.SUCCESS));
         mNotify = new DownloadNotification(this);
-        Log.e("onCreate", "DownloadService开始运行");
-        EventBus.getDefault().post(new Refresh(3));
-        Aria.download(this).resumeAllTask();
+        mNotify.cancelNotification(-2);
+        mNotify.showServiceNotification(-1, "下载服务运行中");
+        Log.e("Service onCreate", "DownloadService开始运行");
         Aria.download(this).register();
     }
 
@@ -63,60 +63,71 @@ public class DownloadService extends Service {
             wakeLock.release();
             wakeLock = null;
         }
+        // 服务关闭时存在未下载完成的任务，停止下载
+        List<DownloadEntity> downloadEntities = Aria.download(this).getAllNotCompleteTask();
+        if (downloadEntities != null && downloadEntities.size() > 0) {
+            mNotify.showServiceNotification(-2, "由于下载服务被系统杀死，任务已暂停，后台下载请根据各自系统设置应用白名单...");
+            Aria.download(this).stopAllTask();
+        }
+        mNotify.cancelNotification(-1);
+        for (Long id : taskIds) {
+            mNotify.cancelNotification(id.intValue());
+        }
         Aria.download(this).unRegister();
-        Log.e("onDestroy", "DownloadService销毁了");
-        handler.post(() -> CustomToast.showToast(getApplicationContext(), "下载服务已关闭", CustomToast.SUCCESS));
+        Log.e("Service onDestroy", "DownloadService销毁了");
         super.onDestroy();
     }
 
     @Download.onWait
     public void onTaskWait(DownloadTask downloadTask) {
-        Log.e("onTaskWait", downloadTask.getTaskName() + "，等待处理");
         EventBus.getDefault().post(new Refresh(3));
     }
 
     @Download.onTaskResume
     public void onTaskResume(DownloadTask downloadTask) {
-        Log.e("onTaskStart", downloadTask.getTaskName() + "，恢复下载");
-        mNotify.showNotification(new Long(downloadTask.getEntity().getId()).intValue(), (String) getAnimeInfo(downloadTask, 0), downloadTask.getTaskName());
+        mNotify.showDefaultNotification(new Long(downloadTask.getEntity().getId()).intValue(), (String) VideoUtils.getAnimeInfo(downloadTask, 0), downloadTask.getTaskName());
 //        EventBus.getDefault().post(new Refresh(3));
     }
 
 
     @Download.onTaskStart
     public void onTaskStart(DownloadTask downloadTask) {
-        Log.e("onTaskStart", downloadTask.getTaskName() + "，开始下载");
-        mNotify.showNotification(new Long(downloadTask.getEntity().getId()).intValue(), (String) getAnimeInfo(downloadTask, 0), downloadTask.getTaskName());
-//        EventBus.getDefault().post(new Refresh(3));
+        EventBus.getDefault().post(new Refresh(3));
+        taskIds.add(new Long(downloadTask.getEntity().getId()));
+        mNotify.showDefaultNotification(new Long(downloadTask.getEntity().getId()).intValue(), (String) VideoUtils.getAnimeInfo(downloadTask, 0), downloadTask.getTaskName());
     }
 
     @Download.onTaskStop
     public void onTaskStop(DownloadTask downloadTask) {
-        Log.e("onTaskStop", downloadTask.getTaskName() + "，停止下载");
-        shouldDestroy();
+        EventBus.getDefault().post(new Refresh(3));
+        shouldUnRegister();
     }
 
     @Download.onTaskCancel
     public void onTaskCancel(DownloadTask downloadTask) {
-        Log.e("onTaskCancel", downloadTask.getTaskName() + "，取消下载");
+        taskIds.add(new Long(downloadTask.getEntity().getId()));
+        mNotify.cancelNotification(new Long(downloadTask.getEntity().getId()).intValue());
 //        showInfo(downloadTask, "取消下载");
-        shouldDestroy();
+        shouldUnRegister();
     }
 
     @Download.onTaskFail
-    public void onTaskFail(DownloadTask downloadTask) {
-        Log.e("onTaskFail", downloadTask.getTaskName() + "，下载失败");
-        DatabaseUtil.updateDownloadError((String) getAnimeInfo(downloadTask, 0), (Integer) getAnimeInfo(downloadTask, 1), downloadTask.getFilePath(), downloadTask.getEntity().getId(), downloadTask.getFileSize());
-        mNotify.uploadInfo(new Long(downloadTask.getEntity().getId()).intValue(), false);
-        shouldDestroy();
+    public void onTaskFail(DownloadTask downloadTask, Exception e) {
+        String animeTitle = (String) VideoUtils.getAnimeInfo(downloadTask, 0);
+        mNotify.uploadInfo(new Long(downloadTask.getEntity().getId()).intValue(), animeTitle, downloadTask.getTaskName(), "下载失败 → " + (e == null ? "未知错误，或许是下载的资源不存在！" : e.getMessage()));
+        DatabaseUtil.updateDownloadError((String) VideoUtils.getAnimeInfo(downloadTask, 0), (Integer) VideoUtils.getAnimeInfo(downloadTask, 1), downloadTask.getFilePath(), downloadTask.getEntity().getId(), downloadTask.getFileSize());
+//        handler.post(() -> CustomToast.showToast(getApplicationContext(), VideoUtils.getAnimeInfo(downloadTask, 0) + " " + downloadTask.getTaskName() + "下载失败\n" +  ALog.getExceptionString(e), CustomToast.ERROR));
+        shouldUnRegister();
     }
 
     @Download.onTaskComplete
     public void onTaskComplete(DownloadTask downloadTask) {
-        Log.e("onTaskComplete", downloadTask.getTaskName() + "，下载完成");
-        mNotify.uploadInfo(new Long(downloadTask.getEntity().getId()).intValue(), true);
-        DatabaseUtil.updateDownloadSuccess((String) getAnimeInfo(downloadTask, 0), (Integer) getAnimeInfo(downloadTask, 1), downloadTask.getFilePath(), downloadTask.getEntity().getId(), downloadTask.getFileSize());
-        shouldDestroy();
+        String animeTitle = (String) VideoUtils.getAnimeInfo(downloadTask, 0);
+        mNotify.uploadInfo(new Long(downloadTask.getEntity().getId()).intValue(), animeTitle, downloadTask.getTaskName(), "下载成功");
+        DatabaseUtil.updateDownloadSuccess(animeTitle, (Integer) VideoUtils.getAnimeInfo(downloadTask, 1), downloadTask.getFilePath(), downloadTask.getEntity().getId(), downloadTask.getFileSize());
+        Aria.download(this).load(downloadTask.getEntity().getId()).ignoreCheckPermissions().cancel(false); // 下载完成删除任务
+        EventBus.getDefault().post(new DownloadEvent(animeTitle, downloadTask.getTaskName(), downloadTask.getFilePath(), downloadTask.getFileSize()));
+        shouldUnRegister();
     }
 
     @Download.onTaskRunning
@@ -124,19 +135,12 @@ public class DownloadService extends Service {
         mNotify.upload(new Long(downloadTask.getEntity().getId()).intValue(), downloadTask.getPercent());
     }
 
-    private void shouldDestroy() {
+    private void shouldUnRegister() {
         List<DownloadEntity> list = Aria.download(this).getDRunningTask();
-        if (list == null || list.size() == 0) stopSelf();
-    }
-
-    /**
-     * 根据任务ID查询数据库信息
-     * @param downloadTask
-     * @param choose 0 返回番剧标题 1 返回番剧来源
-     * @return
-     */
-    private Object getAnimeInfo(DownloadTask downloadTask, int choose) {
-        List<Object> objects = DatabaseUtil.queryDownloadAnimeInfo(downloadTask.getEntity().getId());
-        return objects.get(choose);
+        if (list == null || list.size() == 0) {
+            // 没有正在执行的任务
+            mNotify.cancelNotification(-1);
+            EventBus.getDefault().post(new Refresh(100));
+        }
     }
 }

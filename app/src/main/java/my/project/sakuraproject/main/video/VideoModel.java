@@ -1,20 +1,23 @@
 package my.project.sakuraproject.main.video;
 
+import android.util.Log;
+
 import java.io.IOException;
 import java.util.List;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import my.project.sakuraproject.api.Api;
 import my.project.sakuraproject.application.Sakura;
 import my.project.sakuraproject.bean.AnimeDescDetailsBean;
-import my.project.sakuraproject.bean.ImomoeVideoUrlBean;
 import my.project.sakuraproject.database.DatabaseUtil;
 import my.project.sakuraproject.main.base.BaseModel;
 import my.project.sakuraproject.net.HttpGet;
+import my.project.sakuraproject.net.HttpPost;
 import my.project.sakuraproject.util.ImomoeJsoupUtils;
 import my.project.sakuraproject.util.YhdmJsoupUtils;
 import okhttp3.Call;
 import okhttp3.Callback;
+import okhttp3.FormBody;
 import okhttp3.Response;
 
 public class VideoModel extends BaseModel implements VideoContract.Model {
@@ -22,20 +25,11 @@ public class VideoModel extends BaseModel implements VideoContract.Model {
     private boolean isImomoe;
     @Override
     public void getData(String title, String url, int source, String playNumber, VideoContract.LoadDataCallback callback) {
-        isImomoe = url.contains("/player/");
+        isImomoe = url.contains("/vodplay/");
         if (isImomoe)
-            parserImomoe(title, BaseModel.getDomain(true) + url, source, playNumber, false, callback);
+            parserImomoe(title, getDomain(true) + url, source, playNumber, callback);
         else
-            parserYhdm(title, BaseModel.getDomain(false) + url, source, playNumber, callback);
-    }
-
-    @Override
-    public void getVideoUrl(String url, VideoContract.LoadDataCallback callback) {
-        isImomoe = url.contains("/player/");
-        if (isImomoe)
-            parserImomoeVideoUrls(url, false, callback);
-        else
-            parserYhdmVideoUrls(url, callback);
+            parserYhdm(title, getDomain(false) + url, source, playNumber, callback);
     }
 
     private void parserYhdm(String title, String url, int playSource, String playNumber, VideoContract.LoadDataCallback callback) {
@@ -56,7 +50,7 @@ public class VideoModel extends BaseModel implements VideoContract.Model {
                 else {
                     String fid = DatabaseUtil.getAnimeID(title, 0);
                     DatabaseUtil.addIndex(fid, url, playSource, playNumber);
-                    String dataBaseDrama = DatabaseUtil.queryAllIndex(fid);
+                    String dataBaseDrama = DatabaseUtil.queryAllIndex(fid, true, playSource);
                     callback.successYhdmDramas(YhdmJsoupUtils.getAllDrama(source, dataBaseDrama));
                     List<String> urls = YhdmJsoupUtils.getVideoUrlList(source);
                     if (urls.size() > 0)
@@ -68,9 +62,11 @@ public class VideoModel extends BaseModel implements VideoContract.Model {
         });
     }
 
-    private void parserImomoe(String title, String url, int playSource, String playNumber, boolean isJs, VideoContract.LoadDataCallback callback) {
+    private void parserImomoe(String title, String url, int playSource, String playNumber, VideoContract.LoadDataCallback callback) {
         callback.log(url);
-        new HttpGet(url, new Callback() {
+        Log.e("url", url);
+        // 2023年10月13日 失效
+        /*new HttpGet(url, new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
                 callback.error();
@@ -79,37 +75,60 @@ public class VideoModel extends BaseModel implements VideoContract.Model {
             @Override
             public void onResponse(Call call, Response response) throws IOException {
                 String source = getHtmlBody(response, true);
-                String js = "";
-                if (!isJs) {
+                String fid = DatabaseUtil.getAnimeID(title, 1);
+                DatabaseUtil.addIndex(fid, url, playSource, playNumber);
+                String dataBaseDrama = DatabaseUtil.queryAllIndex(fid, true, playSource);
+                List<AnimeDescDetailsBean> bean = ImomoeJsoupUtils.getAllDrama(source, dataBaseDrama);
+                callback.successImomoeDramas(bean);
+                String playUrl = ImomoeJsoupUtils.getImomoePlayUrl(source);
+                if (!playUrl.isEmpty())
+                    callback.successImomoeVideoUrl(playUrl);
+                else
+                    callback.empty();
+            }
+        });*/
+        FormBody body =  new FormBody.Builder().add("player", "sili").build();
+        new HttpPost(url, body, new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                callback.error();
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                String source = getHtmlBody(response, true);
+                String decodeData = ImomoeJsoupUtils.getDecodeData(source);
+                if (decodeData.isEmpty())
+                    callback.empty();
+                else {
+                    String playUrl = ImomoeJsoupUtils.getJsonData(true, decodeData);
+                    if (playUrl.isEmpty()) {
+                        callback.empty();
+                        return;
+                    }
                     String fid = DatabaseUtil.getAnimeID(title, 1);
                     DatabaseUtil.addIndex(fid, url, playSource, playNumber);
-                    String dataBaseDrama = DatabaseUtil.queryAllIndex(fid);
-                    List<List< AnimeDescDetailsBean >> bean = ImomoeJsoupUtils.getAllDrama(source, dataBaseDrama);
+                    String dataBaseDrama = DatabaseUtil.queryAllIndex(fid, true, playSource);
+                    String html = ImomoeJsoupUtils.getJsonData(false, decodeData);
+                    List<AnimeDescDetailsBean> bean = ImomoeJsoupUtils.getAllDrama(html, dataBaseDrama);
                     callback.successImomoeDramas(bean);
-                    js = ImomoeJsoupUtils.getPlayDataJs(source);
-                    if (js.isEmpty()) callback.empty();
-                    else parserImomoe(title, getDomain(true) + js, playSource, playNumber, true, callback);
-                } else {
-                    Matcher matcher = PLAY_DATA_PATTERN.matcher(source);
-                    String json = "";
-                    if (matcher.find()) {
-                        json = matcher.group();
-                    }
-                    if (json.isEmpty()) return;
-                    else {
-                        List<List<ImomoeVideoUrlBean>> imomoeBeans = ImomoeJsoupUtils.getImomoePlayUrl(json);
-                        if (imomoeBeans.size() > 0)
-                            callback.successImomoeVideoUrls(imomoeBeans);
-                        else
-                            callback.empty();
-                    }
+                    callback.successImomoeVideoUrl(playUrl);
                 }
             }
         });
     }
-
-    private void parserYhdmVideoUrls(String url, VideoContract.LoadDataCallback callback ) {
-        new HttpGet(url, new Callback() {
+    /**
+     * 第二套解析方案
+     * @param url
+     * @param callback
+     */
+    @Override
+    @Deprecated
+    public void getSilisiliVideoUrl(String url, VideoContract.LoadDataCallback callback) {
+        String parseUrl = String.format(Api.SILISILI_PARSE_API, getDomain(true), url);
+        callback.log(parseUrl);
+        Log.e("parseUrl", parseUrl);
+        new HttpGet(parseUrl, new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
                 callback.error();
@@ -118,52 +137,12 @@ public class VideoModel extends BaseModel implements VideoContract.Model {
             @Override
             public void onResponse(Call call, Response response) throws IOException {
                 String source = getHtmlBody(response, false);
-                if (YhdmJsoupUtils.hasRedirected(source))
-                    parserYhdmVideoUrls(Sakura.DOMAIN + YhdmJsoupUtils.getRedirectedStr(source), callback);
-                else if (YhdmJsoupUtils.hasRefresh(source))
-                    parserYhdmVideoUrls(url, callback);
-                else {
-                    List<String> urls = YhdmJsoupUtils.getVideoUrlList(source);
-                    if (urls.size() > 0)
-                        callback.successYhdmVideoUrls(urls);
-                    else
-                        callback.empty();
-                }
-            }
-        });
-    }
-
-    private void parserImomoeVideoUrls( String url, boolean isJs, VideoContract.LoadDataCallback callback) {
-        callback.log(url);
-        new HttpGet(url, new Callback() {
-            @Override
-            public void onFailure(Call call, IOException e) {
-                callback.error();
-            }
-
-            @Override
-            public void onResponse(Call call, Response response) throws IOException {
-                String source = getHtmlBody(response, true);
-                String js = "";
-                if (!isJs) {
-                    js = ImomoeJsoupUtils.getPlayDataJs(source);
-                    if (js.isEmpty()) callback.empty();
-                    else parserImomoeVideoUrls(getDomain(true) + js, true, callback);
-                } else {
-                    Matcher matcher = PLAY_DATA_PATTERN.matcher(source);
-                    String json = "";
-                    if (matcher.find()) {
-                        json = matcher.group();
-                    }
-                    if (json.isEmpty()) return;
-                    else {
-                        List<List<ImomoeVideoUrlBean>> imomoeBeans = ImomoeJsoupUtils.getImomoePlayUrl(json);
-                        if (imomoeBeans.size() > 0)
-                            callback.successImomoeVideoUrls(imomoeBeans);
-                        else
-                            callback.empty();
-                    }
-                }
+                String playUrl = ImomoeJsoupUtils.getSilisiliVideoUrl(source);
+                Log.e("playUrl", playUrl);
+                if (!playUrl.isEmpty())
+                    callback.successImomoeVideoUrl(playUrl);
+                else
+                    callback.empty();
             }
         });
     }

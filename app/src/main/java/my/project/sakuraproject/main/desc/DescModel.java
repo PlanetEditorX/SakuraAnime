@@ -24,7 +24,7 @@ public class DescModel extends BaseModel implements DescContract.Model {
 
     @Override
     public void getData(String url, DescContract.LoadDataCallback callback) {
-        if (url.contains("/view/"))
+        if (url.contains("/voddetail/"))
             parserImomoe(getDomain(true) + url, callback);
         else
             parserYhdm(getDomain(false) + url, callback);
@@ -57,7 +57,7 @@ public class DescModel extends BaseModel implements DescContract.Model {
                         DatabaseUtil.addOrUpdateHistory(fid, animeListBean.getUrl(), animeListBean.getImg());
                         //是否收藏
                         callback.isFavorite(DatabaseUtil.checkFavorite(fid));
-                        dramaStr = DatabaseUtil.queryAllIndex(fid);
+                        dramaStr = DatabaseUtil.queryAllIndex(fid, false, 0);
                         callback.successDesc(animeListBean);
                         callback.isImomoe(false);
                         callback.getAnimeId(fid);
@@ -89,23 +89,30 @@ public class DescModel extends BaseModel implements DescContract.Model {
                     String source = getHtmlBody(response, true);
                     AnimeListBean animeListBean = ImomoeJsoupUtils.getAinmeInfo(source, url);
                     String animeTitle = animeListBean.getTitle();
-                    //创建番剧索引
-                    DatabaseUtil.addAnime(animeTitle, 1);
-                    fid = DatabaseUtil.getAnimeID(animeTitle, 1);
-                    // 添加历史记录
-                    DatabaseUtil.addOrUpdateHistory(fid, animeListBean.getUrl(), animeListBean.getImg());
-                    //是否收藏
-                    callback.isFavorite(DatabaseUtil.checkFavorite(fid));
-                    dramaStr = DatabaseUtil.queryAllIndex(fid);
-                    Log.e("dramaStr", dramaStr);
-                    callback.successDesc(animeListBean);
-                    callback.isImomoe(true);
-                    callback.getAnimeId(fid);
-                    AnimeDescListBean animeDescListBean = ImomoeJsoupUtils.getAnimeDescList(source, dramaStr);
-                    if (animeDescListBean != null)
-                        callback.successMain(animeDescListBean);
-                    else
-                        callback.emptyDram(Utils.getString(R.string.no_playlist_error));
+                    if (animeTitle == null || animeTitle.isEmpty()) {
+                        callback.error("地址解析失败，可能该番剧的地址变更导致，请使用搜索！");
+                    } else {
+                        //创建番剧索引
+                        DatabaseUtil.addAnime(animeTitle, 1);
+                        fid = DatabaseUtil.getAnimeID(animeTitle, 1);
+                        Log.e("fid", fid);
+                        // 添加历史记录
+                        DatabaseUtil.addOrUpdateHistory(fid, animeListBean.getUrl(), animeListBean.getImg());
+                        //是否收藏
+                        callback.isFavorite(DatabaseUtil.checkFavorite(fid));
+                        dramaStr = DatabaseUtil.queryAllIndex(fid, false, 0);
+                        Log.e("dramaStr", dramaStr);
+                        callback.successDesc(animeListBean);
+                        callback.isImomoe(true);
+                        callback.getAnimeId(fid);
+                        AnimeDescListBean animeDescListBean = ImomoeJsoupUtils.getAnimeDescList(source, dramaStr);
+                        if (animeDescListBean != null)
+                            callback.successMain(animeDescListBean);
+                        else if (animeDescListBean.getAnimeDramasBeans().size() == 0)
+                            callback.emptyDram(Utils.getString(R.string.no_playlist_error));
+                        else
+                            callback.emptyDram(Utils.getString(R.string.no_playlist_error));
+                    }
                 } catch (Exception e) {
                     e.printStackTrace();
                     callback.error(e.getMessage());

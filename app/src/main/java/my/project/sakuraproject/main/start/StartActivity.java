@@ -1,8 +1,14 @@
 package my.project.sakuraproject.main.start;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ObjectAnimator;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.graphics.Path;
 import android.os.Handler;
 import android.view.View;
+import android.view.animation.AnticipateInterpolator;
 import android.widget.LinearLayout;
 
 import org.json.JSONException;
@@ -10,13 +16,14 @@ import org.json.JSONObject;
 
 import java.io.IOException;
 
+import androidx.core.splashscreen.SplashScreen;
 import butterknife.BindView;
 import my.project.sakuraproject.R;
 import my.project.sakuraproject.api.Api;
 import my.project.sakuraproject.custom.CustomToast;
 import my.project.sakuraproject.main.base.BaseActivity;
 import my.project.sakuraproject.main.base.Presenter;
-import my.project.sakuraproject.main.home.HomeActivity;
+import my.project.sakuraproject.main.home.MainActivity;
 import my.project.sakuraproject.net.HttpGet;
 import my.project.sakuraproject.util.SharedPreferencesUtils;
 import my.project.sakuraproject.util.StatusBarUtil;
@@ -29,6 +36,9 @@ public class StartActivity extends BaseActivity {
     @BindView(R.id.check_update)
     LinearLayout linearLayout;
     private String downUrl;
+    private SplashScreen splashScreen;
+    private boolean keep = true;
+    private final int DELAY = 1000;
 
     @Override
     protected Presenter createPresenter() {
@@ -46,17 +56,51 @@ public class StartActivity extends BaseActivity {
 
     @Override
     protected void init() {
-        hideGap();
-        SharedPreferencesUtils.setParam(this, "initX5", "init");
+        //Keep returning false to Should Keep On Screen until ready to begin.
+        splashScreen.setKeepVisibleCondition((SplashScreen.KeepOnScreenCondition) () -> keep);
         Handler handler = new Handler();
-        handler.postDelayed(() -> {
-            linearLayout.setVisibility(View.VISIBLE);
-            checkUpdate();
-        }, 1000);
+        handler.postDelayed(runner, DELAY);
+        splashScreen.setOnExitAnimationListener(splashScreenView -> {
+            Path path = new Path();
+            path.moveTo(1.0f, 1.0f);
+            path.lineTo(0f, 0f);
+            final ObjectAnimator scaleOut = ObjectAnimator.ofFloat(
+                    splashScreenView.getIconView(),
+                    View.SCALE_X,
+                    View.SCALE_Y,
+                    path
+            );
+            scaleOut.setInterpolator(new AnticipateInterpolator());
+            scaleOut.setDuration(200L);
+
+            // Call SplashScreenView.remove at the end of your custom animation.
+            scaleOut.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    splashScreenView.remove();
+                }
+            });
+
+            // Run your animation.
+            scaleOut.start();
+        });
     }
+
+    /**Will cause a second process to run on the main thread**/
+    private final Runnable runner = () -> {
+        keep = false;
+        if ((Integer) SharedPreferencesUtils.getParam(this, "start_check_update", 0) == 0) {
+            new Handler().postDelayed(() -> {
+                linearLayout.setVisibility(View.VISIBLE);
+                checkUpdate();
+            }, 1000);
+        } else
+            openMain();
+    };
 
     @Override
     protected void initBeforeView() {
+        splashScreen = SplashScreen.installSplashScreen(this);
         StatusBarUtil.setColorNoTranslucent(this, getResources().getColor(R.color.logo_bg));
     }
 
@@ -87,20 +131,20 @@ public class StartActivity extends BaseActivity {
                     else {
                         downUrl = obj.getJSONArray("assets").getJSONObject(0).getString("browser_download_url");
                         String body = obj.getString("body");
-                        runOnUiThread(() -> Utils.findNewVersion(StartActivity.this,
-                                newVersion,
+                        runOnUiThread(() ->
+                        Utils.showAlert(StartActivity.this,
+                                getString(R.string.find_new_version) + newVersion,
                                 body,
-                                (dialog, which) -> {
-                                    dialog.dismiss();
-                                    Utils.putTextIntoClip(downUrl);
-//                                    application.showSuccessToastMsg(Utils.getString(R.string.url_copied));
-                                    CustomToast.showToast(StartActivity.this, Utils.getString(R.string.url_copied), CustomToast.SUCCESS);
-                                    Utils.viewInChrome(StartActivity.this, downUrl);
+                                false,
+                                getString(R.string.update_now),
+                                getString(R.string.update_after),
+                                null,
+                                (DialogInterface.OnClickListener) (dialogInterface, i) -> {
+                                    dialogInterface.dismiss();
+                                    viewInBrowser();
                                 },
-                                (dialog, which) -> {
-                                    dialog.dismiss();
-                                    openMain();
-                                })
+                                null,
+                                null)
                         );
                     }
                 } catch (JSONException e) {
@@ -113,8 +157,14 @@ public class StartActivity extends BaseActivity {
         });
     }
 
+    private void viewInBrowser() {
+        Utils.putTextIntoClip(downUrl);
+        CustomToast.showToast(this, Utils.getString(R.string.url_copied), CustomToast.SUCCESS);
+        Utils.viewInChrome(this, downUrl);
+    }
+
     private void openMain() {
-        startActivity(new Intent(StartActivity.this, HomeActivity.class));
+        startActivity(new Intent(StartActivity.this, MainActivity.class));
         StartActivity.this.finish();
     }
 }

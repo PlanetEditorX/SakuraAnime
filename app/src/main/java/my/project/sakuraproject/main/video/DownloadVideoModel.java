@@ -4,18 +4,20 @@ import android.util.Log;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import my.project.sakuraproject.api.Api;
 import my.project.sakuraproject.application.Sakura;
-import my.project.sakuraproject.bean.ImomoeVideoUrlBean;
-import my.project.sakuraproject.bean.YhdmViideoUrlBean;
+import my.project.sakuraproject.bean.AnimeDescDetailsBean;
+import my.project.sakuraproject.database.DatabaseUtil;
 import my.project.sakuraproject.main.base.BaseModel;
 import my.project.sakuraproject.net.HttpGet;
+import my.project.sakuraproject.net.HttpPost;
 import my.project.sakuraproject.util.ImomoeJsoupUtils;
 import my.project.sakuraproject.util.YhdmJsoupUtils;
 import okhttp3.Call;
 import okhttp3.Callback;
+import okhttp3.FormBody;
 import okhttp3.Response;
 
 public class DownloadVideoModel extends BaseModel implements DownloadVideoContract.Model {
@@ -24,7 +26,7 @@ public class DownloadVideoModel extends BaseModel implements DownloadVideoContra
     @Override
     public void getData(String url, String playNumber, int source, DownloadVideoContract.LoadDataCallback callback) {
         if (source == 1)
-            parserImomoeVideoUrls(getDomain(true) + url, playNumber, false, callback);
+            parserImomoeVideoUrls(getDomain(true) + url, playNumber, callback);
         else
             parserYhdmVideoUrls(getDomain(false) + url, playNumber, callback);
     }
@@ -45,12 +47,12 @@ public class DownloadVideoModel extends BaseModel implements DownloadVideoContra
                     parserYhdmVideoUrls(url, playNumber, callback);
                 else {
                     List<String> urls = YhdmJsoupUtils.getVideoUrlList(source);
-                    if (urls.size() > 0) {
-                        YhdmViideoUrlBean yhdmViideoUrlBean = null;
+                    /*if (urls.size() > 0) {
+                        YhdmVideoUrlBean yhdmViideoUrlBean = null;
                         for (String url : urls) {
                             if (!url.contains("$")) {
                                 if (HttpGet.isSuccess(url)) {
-                                    yhdmViideoUrlBean = new YhdmViideoUrlBean();
+                                    yhdmViideoUrlBean = new YhdmVideoUrlBean();
                                     yhdmViideoUrlBean.setHttp(true);
                                     yhdmViideoUrlBean.setVidOrUrl(url);
                                     break;
@@ -59,7 +61,7 @@ public class DownloadVideoModel extends BaseModel implements DownloadVideoContra
                                     continue;
                                 }
                             } else {
-                                yhdmViideoUrlBean = new YhdmViideoUrlBean();
+                                yhdmViideoUrlBean = new YhdmVideoUrlBean();
                                 yhdmViideoUrlBean.setHttp(false);
                                 yhdmViideoUrlBean.setVidOrUrl(url);
                                 break;
@@ -69,7 +71,9 @@ public class DownloadVideoModel extends BaseModel implements DownloadVideoContra
                             callback.error(playNumber);
                         else
                             callback.successYhdmVideoUrls(yhdmViideoUrlBean, playNumber);
-                    }
+                    }*/
+                    if (urls.size() > 0)
+                        callback.successYhdmVideoUrls(urls, playNumber);
                     else
                         callback.error(playNumber);
                 }
@@ -77,9 +81,10 @@ public class DownloadVideoModel extends BaseModel implements DownloadVideoContra
         });
     }
 
-    private void parserImomoeVideoUrls( String url, String playNumber, boolean isJs, DownloadVideoContract.LoadDataCallback callback) {
+    private void parserImomoeVideoUrls( String url, String playNumber, DownloadVideoContract.LoadDataCallback callback) {
         callback.log(url);
-        new HttpGet(url, new Callback() {
+        // 2023年10月13日 失效
+        /*new HttpGet(url, new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
                 callback.error(playNumber);
@@ -88,27 +93,69 @@ public class DownloadVideoModel extends BaseModel implements DownloadVideoContra
             @Override
             public void onResponse(Call call, Response response) throws IOException {
                 String source = getHtmlBody(response, true);
-                String js = "";
-                if (!isJs) {
-                    js = ImomoeJsoupUtils.getPlayDataJs(source);
-                    if (js.isEmpty()) callback.error(playNumber);
-                    else parserImomoeVideoUrls(getDomain(true) + js, playNumber, true, callback);
-                } else {
-                    Matcher matcher = PLAY_DATA_PATTERN.matcher(source);
-                    String json = "";
-                    if (matcher.find()) {
-                        json = matcher.group();
-                    }
-                    if (json.isEmpty())
-                        callback.error(playNumber);
-                    else {
-                        List<List<ImomoeVideoUrlBean>> imomoeBeans = ImomoeJsoupUtils.getImomoePlayUrl(json);
-                        if (imomoeBeans.size() > 0)
-                            callback.successImomoeVideoUrls(imomoeBeans, playNumber);
-                        else
-                            callback.error(playNumber);
-                    }
+                String playUrl = ImomoeJsoupUtils.getImomoePlayUrl(source);
+                if (!playUrl.isEmpty()) {
+                    if (!playUrl.contains("http")) {
+                        // 不是连接 使用第二套解析方案
+                        getSilisiliVideoUrl(playUrl, playNumber, callback);
+                    } else
+                        callback.successImomoeVideoUrls(playUrl, playNumber);
                 }
+                else
+                    callback.error(playNumber);
+            }
+        });*/
+        FormBody body =  new FormBody.Builder().add("player", "sili").build();
+        new HttpPost(url, body, new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                callback.error(playNumber);
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                String source = getHtmlBody(response, true);
+                String decodeData = ImomoeJsoupUtils.getDecodeData(source);
+                if (decodeData.isEmpty())
+                    callback.error(playNumber);
+                else {
+                    String playUrl = ImomoeJsoupUtils.getJsonData(true, decodeData);
+                    if (playUrl.isEmpty()) {
+                        callback.error(playNumber);
+                        return;
+                    }
+                    callback.successImomoeVideoUrls(playUrl, playNumber);
+                }
+            }
+        });
+    }
+
+    /**
+     * 第二套解析方案
+     * @param url
+     * @param playNumber
+     * @param callback
+     */
+    @Deprecated
+    public void getSilisiliVideoUrl(String url, String playNumber, DownloadVideoContract.LoadDataCallback callback) {
+        String parseUrl = String.format(Api.SILISILI_PARSE_API, getDomain(true), url);
+        callback.log(parseUrl);
+        Log.e("parseUrl", parseUrl);
+        new HttpGet(parseUrl, new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                callback.error(playNumber);
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                String source = getHtmlBody(response, false);
+                String playUrl = ImomoeJsoupUtils.getSilisiliVideoUrl(source);
+                Log.e("playUrl", playUrl);
+                if (!playUrl.isEmpty())
+                    callback.successImomoeVideoUrls(playUrl, playNumber);
+                else
+                    callback.error(playNumber);
             }
         });
     }

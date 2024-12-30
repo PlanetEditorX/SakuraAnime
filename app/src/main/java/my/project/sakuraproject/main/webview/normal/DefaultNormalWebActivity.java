@@ -14,14 +14,16 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 
+import androidx.appcompat.widget.Toolbar;
 import butterknife.BindView;
-import butterknife.OnClick;
 import my.project.sakuraproject.R;
 import my.project.sakuraproject.main.base.BaseActivity;
 import my.project.sakuraproject.main.base.Presenter;
 import my.project.sakuraproject.util.Utils;
 
 public class DefaultNormalWebActivity extends BaseActivity {
+    @BindView(R.id.toolbar)
+    Toolbar toolbar;
     private String url;
     @BindView(R.id.webview)
     NormalWebView normalWebView;
@@ -53,13 +55,20 @@ public class DefaultNormalWebActivity extends BaseActivity {
 
     @Override
     protected void init() {
-        hideGap();
+        initToolbar();
         getBundle();
         initWebView();
     }
 
     @Override
     protected void initBeforeView() {
+    }
+
+    public void initToolbar() {
+        toolbar.setTitle("网页播放");
+        setSupportActionBar(toolbar);
+        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        toolbar.setNavigationOnClickListener(view -> finish());
     }
 
     public void getBundle() {
@@ -208,10 +217,5 @@ public class DefaultNormalWebActivity extends BaseActivity {
         super.onResume();
         if (isFullscreen) hideNavBar();
         else showNavBar();
-    }
-
-    @OnClick(R.id.back)
-    public void back() {
-        finish();
     }
 }

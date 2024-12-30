@@ -20,6 +20,13 @@ public class HomePresenter extends Presenter<HomeContract.View> implements BaseP
         model = new HomeModel();
     }
 
+    /*public HomePresenter(boolean isWeek, HomeContract.View view) {
+        super(view);
+        this.isWeek = isWeek;
+        this.view = view;
+        model = new HomeModel();
+    }*/
+
     @Override
     public void loadData(boolean isMain) {
         if (isMain)

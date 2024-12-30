@@ -1,13 +1,14 @@
 package my.project.sakuraproject.main.my.fragment;
 
 import android.content.Intent;
-import android.content.res.Configuration;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ProgressBar;
 
+import com.chad.library.adapter.base.BaseQuickAdapter;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import org.greenrobot.eventbus.Subscribe;
@@ -27,7 +28,6 @@ import my.project.sakuraproject.R;
 import my.project.sakuraproject.adapter.HistoryListAdapter;
 import my.project.sakuraproject.bean.AnimeDescDetailsBean;
 import my.project.sakuraproject.bean.HistoryBean;
-import my.project.sakuraproject.bean.ImomoeVideoUrlBean;
 import my.project.sakuraproject.bean.Refresh;
 import my.project.sakuraproject.bean.UpdateImgBean;
 import my.project.sakuraproject.custom.CustomLoadMoreView;
@@ -45,6 +45,7 @@ import my.project.sakuraproject.util.SharedPreferencesUtils;
 import my.project.sakuraproject.util.Utils;
 import my.project.sakuraproject.util.VideoUtils;
 
+@Deprecated
 public class HistoryFragment extends MyLazyFragment<HistoryContract.View, HistoryPresenter> implements HistoryContract.View,
         UpdateImgContract.View, VideoContract.View {
     @BindView(R.id.rv_list)
@@ -67,8 +68,6 @@ public class HistoryFragment extends MyLazyFragment<HistoryContract.View, Histor
     private int playSource;
     private int source;
     private List<AnimeDescDetailsBean> yhdmDramasBeans;
-    private List<List<ImomoeVideoUrlBean>> imomoeVideoUrlBeans;
-    private List<List<AnimeDescDetailsBean>> imomoeDramasBeans;
     private int clickIndex = 0;
     private View view;
     private FloatingActionButton fab;
@@ -104,8 +103,7 @@ public class HistoryFragment extends MyLazyFragment<HistoryContract.View, Histor
 
     private void initAdapter() {
         adapter = new HistoryListAdapter(getActivity(), historyBeans);
-//        adapter.openLoadAnimation();
-//        adapter.openLoadAnimation(BaseQuickAdapter.ALPHAIN);
+        adapter.openLoadAnimation(BaseQuickAdapter.ALPHAIN);
         adapter.setOnItemClickListener((adapter, view, position) -> {
             if (!Utils.isFastClick()) return;
             animeId = historyBeans.get(position).getAnimeId();
@@ -142,10 +140,10 @@ public class HistoryFragment extends MyLazyFragment<HistoryContract.View, Histor
             if (!Utils.isFastClick()) return false;
             View v = adapter.getViewByPosition(mRecyclerView, position, R.id.title);
             final PopupMenu popupMenu = new PopupMenu(getActivity(), v);
-            popupMenu.getMenuInflater().inflate(R.menu.delete_history_menu, popupMenu.getMenu());
+            popupMenu.getMenuInflater().inflate(R.menu.delete_menu, popupMenu.getMenu());
             popupMenu.setOnMenuItemClickListener(menuItem -> {
                 switch (menuItem.getItemId()) {
-                    case R.id.delete_history:
+                    case R.id.delete:
                         showDeleteHistoryDialog(position, historyBeans.get(position).getHistoryId(), false);
                         break;
                 }
@@ -186,6 +184,7 @@ public class HistoryFragment extends MyLazyFragment<HistoryContract.View, Histor
     private void loadHistoryData() {
         isMain = true;
         historyBeans.clear();
+        setRecyclerViewView();
         mPresenter = createPresenter();
         loadData();
     }
@@ -198,7 +197,8 @@ public class HistoryFragment extends MyLazyFragment<HistoryContract.View, Histor
      */
     private void showDeleteHistoryDialog(int position, String historyId, boolean isAll) {
         AlertDialog alertDialog;
-        AlertDialog.Builder builder = new AlertDialog.Builder(getActivity(), R.style.DialogStyle);
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(getActivity(), R.style.DialogStyle);
+        builder.setTitle(Utils.getString(R.string.other_operation));
         builder.setMessage(isAll ? Utils.getString(R.string.delete_all_history) : Utils.getString(R.string.delete_single_history));
         builder.setPositiveButton(getString(R.string.page_positive), (dialog, which) -> deleteHistory(position, historyId, isAll));
         builder.setNegativeButton(getString(R.string.page_negative), (dialog, which) -> dialog.dismiss());
@@ -220,7 +220,7 @@ public class HistoryFragment extends MyLazyFragment<HistoryContract.View, Histor
         else
             historyBeans.clear();
         if (historyBeans.size() <= 0) {
-            setRecyclerViewView();
+            setRecyclerViewEmpty();
             adapter.setNewData(historyBeans);
             errorTitle.setText(Utils.getString(R.string.empty_history));
             adapter.setEmptyView(errorView);
@@ -238,7 +238,7 @@ public class HistoryFragment extends MyLazyFragment<HistoryContract.View, Histor
         switch ((Integer) SharedPreferencesUtils.getParam(getActivity(), "player", 0)) {
             case 0:
                 //调用播放器
-                switch (source) {
+                /*switch (source) {
                     case 0:
                         // yhdm
                         VideoUtils.openPlayer(true, getActivity(), animeTitle + " - " + dramaTitle, animeUrl, animeTitle, dramaUrl, yhdmDramasBeans, clickIndex, animeId);
@@ -247,7 +247,9 @@ public class HistoryFragment extends MyLazyFragment<HistoryContract.View, Histor
                         // imomoe
                         VideoUtils.openImomoePlayer(true, getActivity(), animeTitle + " - " +dramaTitle, animeUrl, animeTitle, dramaUrl, imomoeDramasBeans, imomoeVideoUrlBeans, playSource, clickIndex, animeId);
                         break;
-                }
+                }*/
+                VideoUtils.openPlayer(true, getActivity(), animeTitle + " - " + dramaTitle, animeUrl, animeTitle, dramaUrl, yhdmDramasBeans, clickIndex, animeId, playSource,source == 1);
+
                 break;
             case 1:
                 Utils.selectVideoPlayer(getActivity(), animeUrl);
@@ -263,7 +265,10 @@ public class HistoryFragment extends MyLazyFragment<HistoryContract.View, Histor
             if (isMain) {
                 loading.setVisibility(View.GONE);
                 historyBeans = list;
-                setRecyclerViewView();
+                if (historyBeans.size() > 0)
+                    setRecyclerViewView();
+                else
+                    setRecyclerViewEmpty();
                 setFabClick();
                 adapter.setNewData(historyBeans);
             } else
@@ -308,7 +313,7 @@ public class HistoryFragment extends MyLazyFragment<HistoryContract.View, Histor
         getActivity().runOnUiThread(() -> {
 //            application.showToastMsg(Utils.getString(R.string.open_web_view));
             CustomToast.showToast(getActivity(), Utils.getString(R.string.open_web_view), CustomToast.WARNING);
-            VideoUtils.openDefaultWebview(getActivity(), dramaUrl.contains("/view/") ? BaseModel.getDomain(true) + dramaUrl : BaseModel.getDomain(false) + dramaUrl);
+            VideoUtils.openDefaultWebview(getActivity(), dramaUrl.contains("/voddetail/") ? BaseModel.getDomain(true) + dramaUrl : BaseModel.getDomain(false) + dramaUrl);
         });
     }
 
@@ -316,7 +321,7 @@ public class HistoryFragment extends MyLazyFragment<HistoryContract.View, Histor
     public void getVideoError() {
         getActivity().runOnUiThread(() -> {
 //            application.showErrorToastMsg(Utils.getString(R.string.error_700));
-            CustomToast.showToast(getActivity(), Utils.getString(R.string.error_700), CustomToast.ERROR);
+            CustomToast.showToast(getActivity(), Utils.getString(R.string.loading_video__failed), CustomToast.ERROR);
         });
     }
 
@@ -326,21 +331,29 @@ public class HistoryFragment extends MyLazyFragment<HistoryContract.View, Histor
     }
 
     @Override
-    public void showSuccessImomoeVideoUrlsView(List<List<ImomoeVideoUrlBean>> bean) {
-        imomoeVideoUrlBeans = bean;
+    public void showSuccessImomoeVideoUrlView(String playUrl) {
+       /* imomoeVideoUrlBeans = bean;
         getActivity().runOnUiThread(() -> {
             if (imomoeVideoUrlBeans.size() > 0) {
                 ImomoeVideoUrlBean imomoeVideoUrlBean = imomoeVideoUrlBeans.get(playSource).get(clickIndex);
                 playAnime(imomoeVideoUrlBean.getVidOrUrl());
             }
-        });
+        });*/
+        playAnime(playUrl);
     }
 
     @Override
-    public void showSuccessImomoeDramasView(List<List<AnimeDescDetailsBean>> bean) {
-        imomoeDramasBeans = bean;
+    public void showSuccessImomoeDramasView(List<AnimeDescDetailsBean> bean) {
+        /*imomoeDramasBeans = bean;
         for (int i=0,size=bean.get(playSource).size(); i<size; i++) {
             if (bean.get(playSource).get(i).getUrl().equals(dramaUrl)) {
+                clickIndex = i;
+                break;
+            }
+        }*/
+        yhdmDramasBeans = bean;
+        for (int i=0,size=bean.size(); i<size; i++) {
+            if (bean.get(i).getUrl().equals(dramaUrl)) {
                 clickIndex = i;
                 break;
             }
@@ -359,7 +372,7 @@ public class HistoryFragment extends MyLazyFragment<HistoryContract.View, Histor
         setLoadState(false);
         getActivity().runOnUiThread(() -> {
             if (isMain) {
-                setRecyclerViewView();
+                setRecyclerViewEmpty();
                 loading.setVisibility(View.GONE);
                 errorTitle.setText(msg);
                 adapter.setEmptyView(errorView);
@@ -394,35 +407,27 @@ public class HistoryFragment extends MyLazyFragment<HistoryContract.View, Histor
     }
 
     @Override
-    public void onResume() {
-        super.onResume();
-        if (isFragmentVisible && Utils.isPad())
-            setRecyclerViewView();
-    }
-
-    @Override
-    public void onConfigurationChanged(Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
+    protected void setConfigurationChanged() {
         setRecyclerViewView();
     }
 
+    private void setRecyclerViewEmpty() {
+        mRecyclerView.setLayoutManager(new GridLayoutManager(getActivity(), 1));
+    }
+
     private void setRecyclerViewView() {
+        position = mRecyclerView.getLayoutManager() == null ? 0 : ((GridLayoutManager) mRecyclerView.getLayoutManager()).findFirstVisibleItemPosition();
         String config = getActivity().getResources().getConfiguration().toString();
         boolean isInMagicWindow = config.contains("miui-magic-windows");
-        if (historyBeans.size() == 0) {
-            mRecyclerView.setLayoutManager(new GridLayoutManager(getActivity(), 1));
-            return;
-        }
-        if (!Utils.isPad()) {
-            mRecyclerView.setLayoutManager(new GridLayoutManager(getActivity(), 1));
-        }
+        if (!Utils.isPad())
+            mRecyclerView.setLayoutManager(new GridLayoutManager(getActivity(), isPortrait ? 1 : 2));
         else {
-            if (isInMagicWindow) {
+            if (isInMagicWindow)
                 mRecyclerView.setLayoutManager(new GridLayoutManager(getActivity(), 1));
-            } else {
+            else
                 mRecyclerView.setLayoutManager(new GridLayoutManager(getActivity(), 2));
-            }
         }
+        mRecyclerView.getLayoutManager().scrollToPosition(position);
     }
 
     @Override

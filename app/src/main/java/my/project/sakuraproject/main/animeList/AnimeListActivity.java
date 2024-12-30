@@ -8,7 +8,6 @@ import android.view.ViewGroup;
 
 import com.chad.library.adapter.base.BaseQuickAdapter;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
-import com.r0adkll.slidr.Slidr;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,7 +26,6 @@ import my.project.sakuraproject.custom.CustomToast;
 import my.project.sakuraproject.main.base.BaseActivity;
 import my.project.sakuraproject.main.desc.DescActivity;
 import my.project.sakuraproject.main.search.SearchActivity;
-import my.project.sakuraproject.util.SwipeBackLayoutUtil;
 import my.project.sakuraproject.util.Utils;
 
 public class AnimeListActivity extends BaseActivity<AnimeListContract.View, AnimeListPresenter> implements AnimeListContract.View {
@@ -44,18 +42,19 @@ public class AnimeListActivity extends BaseActivity<AnimeListContract.View, Anim
     private String title, url;
     private boolean isMovie;
     private boolean isImomoe;
+    private boolean isToptic;
     private int nowPage = 1;
     private int pageCount = 1;
     private boolean isErr = true;
 
     @Override
     protected AnimeListPresenter createPresenter() {
-        return new AnimeListPresenter(url, nowPage, this);
+        return new AnimeListPresenter(url, null, nowPage, this);
     }
 
     @Override
     protected void loadData() {
-        mPresenter.loadData(true, isMovie, isImomoe);
+        mPresenter.loadData(true, isMovie, isImomoe, isToptic);
     }
 
     @Override
@@ -65,7 +64,7 @@ public class AnimeListActivity extends BaseActivity<AnimeListContract.View, Anim
 
     @Override
     protected void init() {
-        Slidr.attach(this, Utils.defaultInit());
+//        Slidr.attach(this, Utils.defaultInit());
         getBundle();
         initToolbar();
         initFab();
@@ -75,7 +74,7 @@ public class AnimeListActivity extends BaseActivity<AnimeListContract.View, Anim
 
     @Override
     protected void initBeforeView() {
-        SwipeBackLayoutUtil.convertActivityToTranslucent(this);
+//        SwipeBackLayoutUtil.convertActivityToTranslucent(this);
     }
 
     public void getBundle() {
@@ -85,6 +84,7 @@ public class AnimeListActivity extends BaseActivity<AnimeListContract.View, Anim
             url = bundle.getString("url");
             isMovie = bundle.getBoolean("isMovie");
             isImomoe = bundle.getBoolean("isImomoe");
+            isToptic = bundle.getBoolean("isToptic");
         }
     }
 
@@ -116,13 +116,12 @@ public class AnimeListActivity extends BaseActivity<AnimeListContract.View, Anim
             nowPage = 1;
             pageCount = 1;
             mPresenter = createPresenter();
-            mPresenter.loadData(true, isMovie, isImomoe);
+            mPresenter.loadData(true, isMovie, isImomoe, isToptic);
         });
     }
 
     public void initAdapter() {
         adapter = new AnimeListAdapter(this, list, false);
-        adapter.openLoadAnimation();
         adapter.openLoadAnimation(BaseQuickAdapter.ALPHAIN);
         adapter.setOnItemClickListener((adapter, view, position) -> {
             if (!Utils.isFastClick()) return;
@@ -146,7 +145,7 @@ public class AnimeListActivity extends BaseActivity<AnimeListContract.View, Anim
                     //成功获取更多数据
                     nowPage++;
                     mPresenter = createPresenter();
-                    mPresenter.loadData(false, isMovie, isImomoe);
+                    mPresenter.loadData(false, isMovie, isImomoe, isToptic);
                 } else {
                     //获取更多数据失败
                     isErr = true;
@@ -177,9 +176,9 @@ public class AnimeListActivity extends BaseActivity<AnimeListContract.View, Anim
         runOnUiThread(() -> {
             if (!mActivityFinish) {
                 if (isMain) {
+                    setRecyclerViewView();
                     mSwipe.setRefreshing(false);
                     list = animeList;
-                    setRecyclerViewView();
                     adapter.setNewData(list);
                 } else {
                     adapter.addData(animeList);
@@ -194,7 +193,7 @@ public class AnimeListActivity extends BaseActivity<AnimeListContract.View, Anim
         runOnUiThread(() -> {
             if (!mActivityFinish) {
                 if (isMain) {
-                    setRecyclerViewView();
+                    setRecyclerViewEmpty();
                     mSwipe.setRefreshing(false);
                     errorTitle.setText(msg);
                     adapter.setEmptyView(errorView);
@@ -229,7 +228,7 @@ public class AnimeListActivity extends BaseActivity<AnimeListContract.View, Anim
     @Override
     public void onResume() {
         super.onResume();
-        if (Utils.isPad()) setRecyclerViewView();
+        setRecyclerViewView();
     }
 
     @Override
@@ -237,22 +236,22 @@ public class AnimeListActivity extends BaseActivity<AnimeListContract.View, Anim
         setRecyclerViewView();
     }
 
+    private void setRecyclerViewEmpty() {
+        mRecyclerView.setLayoutManager(new GridLayoutManager(this, 1));
+    }
+
     private void setRecyclerViewView() {
+        position = mRecyclerView.getLayoutManager() == null ? 0 : ((GridLayoutManager) mRecyclerView.getLayoutManager()).findFirstVisibleItemPosition();
         String config = this.getResources().getConfiguration().toString();
         boolean isInMagicWindow = config.contains("miui-magic-windows");
-        if (list.size() == 0) {
-            mRecyclerView.setLayoutManager(new GridLayoutManager(this, 1));
-            return;
-        }
-        if (!Utils.isPad()) {
-            mRecyclerView.setLayoutManager(new GridLayoutManager(this, 3));
-        }
+        if (!Utils.isPad())
+            mRecyclerView.setLayoutManager(new GridLayoutManager(this, isPortrait ? 3 : 5));
         else {
-            if (isInMagicWindow) {
+            if (isInMagicWindow)
                 mRecyclerView.setLayoutManager(new GridLayoutManager(this, 4));
-            } else {
-                mRecyclerView.setLayoutManager(new GridLayoutManager(this, 5));
-            }
+            else
+                mRecyclerView.setLayoutManager(new GridLayoutManager(this, isPortrait ? 5 : 8));
         }
+        mRecyclerView.getLayoutManager().scrollToPosition(position);
     }
 }

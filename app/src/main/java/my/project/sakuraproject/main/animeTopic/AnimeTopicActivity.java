@@ -8,7 +8,6 @@ import android.view.ViewGroup;
 
 import com.chad.library.adapter.base.BaseQuickAdapter;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
-import com.r0adkll.slidr.Slidr;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,14 +20,13 @@ import butterknife.BindView;
 import butterknife.OnClick;
 import my.project.sakuraproject.R;
 import my.project.sakuraproject.adapter.AnimeListAdapter;
+import my.project.sakuraproject.application.Sakura;
 import my.project.sakuraproject.bean.AnimeListBean;
 import my.project.sakuraproject.custom.CustomLoadMoreView;
 import my.project.sakuraproject.custom.CustomToast;
 import my.project.sakuraproject.main.animeList.AnimeListActivity;
 import my.project.sakuraproject.main.base.BaseActivity;
-import my.project.sakuraproject.main.base.BaseModel;
 import my.project.sakuraproject.main.search.SearchActivity;
-import my.project.sakuraproject.util.SwipeBackLayoutUtil;
 import my.project.sakuraproject.util.Utils;
 
 public class AnimeTopicActivity extends BaseActivity<AnimeTopicContract.View, AnimeTopicPresenter> implements AnimeTopicContract.View {
@@ -49,7 +47,7 @@ public class AnimeTopicActivity extends BaseActivity<AnimeTopicContract.View, An
 
     @Override
     protected AnimeTopicPresenter createPresenter() {
-        return new AnimeTopicPresenter(BaseModel.getDomain(false) + url, nowPage, this);
+        return new AnimeTopicPresenter(Sakura.DOMAIN + url, nowPage, this);
     }
 
     @Override
@@ -64,7 +62,7 @@ public class AnimeTopicActivity extends BaseActivity<AnimeTopicContract.View, An
 
     @Override
     protected void init() {
-        Slidr.attach(this, Utils.defaultInit());
+//        Slidr.attach(this, Utils.defaultInit());
         getBundle();
         initToolbar();
         initFab();
@@ -74,12 +72,7 @@ public class AnimeTopicActivity extends BaseActivity<AnimeTopicContract.View, An
 
     @Override
     protected void initBeforeView() {
-        SwipeBackLayoutUtil.convertActivityToTranslucent(this);
-    }
-
-    @Override
-    protected void setConfigurationChanged() {
-
+//        SwipeBackLayoutUtil.convertActivityToTranslucent(this);
     }
 
     public void getBundle() {
@@ -123,9 +116,7 @@ public class AnimeTopicActivity extends BaseActivity<AnimeTopicContract.View, An
     }
 
     public void initAdapter() {
-        mRecyclerView.setLayoutManager(new GridLayoutManager(this, Utils.isPad() ? 3 : 2));
         adapter = new AnimeListAdapter(this, list, true);
-        adapter.openLoadAnimation();
         adapter.openLoadAnimation(BaseQuickAdapter.ALPHAIN);
         adapter.setOnItemClickListener((adapter, view, position) -> {
             if (!Utils.isFastClick()) return;
@@ -135,6 +126,7 @@ public class AnimeTopicActivity extends BaseActivity<AnimeTopicContract.View, An
             bundle.putString("url", bean.getUrl());
             bundle.putBoolean("isMovie", false);
             bundle.putBoolean("isImomoe", Utils.isImomoe());
+            bundle.putBoolean("isToptic", true);
             startActivity(new Intent(this, AnimeListActivity.class).putExtras(bundle));
         });
         if (Utils.checkHasNavigationBar(this)) mRecyclerView.setPadding(0,0,0, Utils.getNavigationBarHeight(this));
@@ -181,6 +173,7 @@ public class AnimeTopicActivity extends BaseActivity<AnimeTopicContract.View, An
         runOnUiThread(() -> {
             if (!mActivityFinish) {
                 if (isMain) {
+                    setRecyclerViewView();
                     mSwipe.setRefreshing(false);
                     list = animeList;
                     adapter.setNewData(list);
@@ -198,6 +191,7 @@ public class AnimeTopicActivity extends BaseActivity<AnimeTopicContract.View, An
             if (!mActivityFinish) {
                 if (isMain) {
                     mSwipe.setRefreshing(false);
+                    setRecyclerViewEmpty();
                     errorTitle.setText(msg);
                     adapter.setEmptyView(errorView);
                 } else {
@@ -226,5 +220,35 @@ public class AnimeTopicActivity extends BaseActivity<AnimeTopicContract.View, An
     @Override
     public void showLog(String url) {
 //        runOnUiThread(() -> application.showToastShortMsg(url));
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        setRecyclerViewView();
+    }
+
+    @Override
+    protected void setConfigurationChanged() {
+        setRecyclerViewView();
+    }
+
+    private void setRecyclerViewEmpty() {
+        mRecyclerView.setLayoutManager(new GridLayoutManager(this, 1));
+    }
+
+    private void setRecyclerViewView() {
+        position = mRecyclerView.getLayoutManager() == null ? 0 : ((GridLayoutManager) mRecyclerView.getLayoutManager()).findFirstVisibleItemPosition();
+        String config = this.getResources().getConfiguration().toString();
+        boolean isInMagicWindow = config.contains("miui-magic-windows");
+        if (!Utils.isPad())
+            mRecyclerView.setLayoutManager(new GridLayoutManager(this, isPortrait ? 2 : 4));
+        else {
+            if (isInMagicWindow)
+                mRecyclerView.setLayoutManager(new GridLayoutManager(this, 3));
+            else
+                mRecyclerView.setLayoutManager(new GridLayoutManager(this, isPortrait ? 3 : 4));
+        }
+        mRecyclerView.getLayoutManager().scrollToPosition(position);
     }
 }

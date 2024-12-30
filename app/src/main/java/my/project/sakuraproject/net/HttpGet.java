@@ -17,11 +17,21 @@ public class HttpGet {
         OkHttpClient client = new OkHttpClient.Builder()
                 .connectTimeout(connectTimeout, TimeUnit.SECONDS)
                 .readTimeout(readTimeout, TimeUnit.SECONDS)
+                .sslSocketFactory(SSLSocketClient.getSSLSocketFactory(), SSLSocketClient.getX509TrustManager())
+                .hostnameVerifier(SSLSocketClient.getHostnameVerifier())
                 .build();
-        Request request = new Request.Builder()
-                .url(url)
-                .get()
-                .build();
+        Request request;
+        if (url.contains("silisili")) // 临时解决S站无法访问的问题
+            request =new Request.Builder()
+                    .url(url)
+                    .addHeader("Cookie", "silisili=on;path=/;max-age=86400")
+                    .get()
+                    .build();
+        else
+            request = new Request.Builder()
+                    .url(url)
+                    .get()
+                    .build();
         Call call = client.newCall(request);
         call.enqueue(callback);
     }

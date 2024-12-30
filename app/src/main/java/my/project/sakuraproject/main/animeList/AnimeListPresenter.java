@@ -11,22 +11,24 @@ public class AnimeListPresenter extends Presenter<AnimeListContract.View> implem
     private int page;
     private AnimeListContract.View view;
     private AnimeListModel model;
+    private List<String> siliParams;
 
-    public AnimeListPresenter(String url, int page, AnimeListContract.View view) {
+    public AnimeListPresenter(String url, List<String> siliParams, int page, AnimeListContract.View view) {
         super(view);
         this.url = url;
-        this.view = view;
+        this.siliParams = siliParams;
         this.page = page;
+        this.view = view;
         model = new AnimeListModel();
     }
 
-    public void loadData(boolean isMain, boolean isMovie,  boolean isImomoe) {
+    public void loadData(boolean isMain, boolean isMovie,  boolean isImomoe, boolean isToptic) {
         if (isMain) {
             view.showLoadingView();
             view.showEmptyVIew();
         }
         try {
-            model.getData(url, page, isMain, isMovie, isImomoe, this);
+            model.getData(url, page, isMain, isMovie, isImomoe, isToptic, siliParams, this);
         } catch (UnsupportedEncodingException e) {
             e.printStackTrace();
         }

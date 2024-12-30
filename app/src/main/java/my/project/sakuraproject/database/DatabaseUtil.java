@@ -1,10 +1,16 @@
 package my.project.sakuraproject.database;
 
+import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.os.Environment;
+import android.util.Log;
 import android.widget.Toast;
+
+import androidx.annotation.NonNull;
+
+import com.arialyy.aria.core.Aria;
 
 import java.io.File;
 import java.text.ParseException;
@@ -14,7 +20,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
-import androidx.annotation.NonNull;
 import my.project.sakuraproject.application.Sakura;
 import my.project.sakuraproject.bean.AnimeListBean;
 import my.project.sakuraproject.bean.AnimeUpdateInfoBean;
@@ -33,13 +38,53 @@ public class DatabaseUtil {
      * 创建tables
      */
     public static void CREATE_TABLES() {
-        db = SQLiteDatabase.openOrCreateDatabase(DB_PATH, null);
+        db = SQLiteDatabase.openOrCreateDatabase(Utils.hasFilePermission() ? DB_PATH : Utils.getPrivateDbPath(), null);
         db.execSQL("create table if not exists T_ANIME(F_INDEX integer primary key autoincrement, F_ID text, F_TITLE text, F_SOURCE integer)");
         db.execSQL("create table if not exists T_FAVORITE(F_INDEX integer primary key autoincrement, F_ID text, F_LINK_ID text, F_IMG_URL text, F_URL text, F_DESC text, F_LAST_PLAY_NUMBER text, F_LAST_UPDATE_NUMBER text, F_STATE integer)");
         db.execSQL("create table if not exists T_HISTORY(F_INDEX integer primary key autoincrement, F_ID text, F_LINK_ID text, F_DESC_URL text, F_IMG_URL text, F_VISIBLE integer, F_UPDATE_TIME text)");
         db.execSQL("create table if not exists T_HISTORY_DATA(F_INDEX integer primary key autoincrement, F_ID text, F_LINK_ID text, F_PLAY_SOURCE integer, F_PLAY_URL text, F_PLAY_NUMBER text, F_PROGRESS integer, F_DURATION integer, F_UPDATE_TIME text)");
         db.execSQL("create table if not exists T_DOWNLOAD(F_INDEX integer primary key autoincrement, F_ID text, F_LINK_ID text, F_IMG_URL text, F_DESC_URL, F_CREATE_TIME text, F_UPDATE_TIME text)");
         db.execSQL("create table if not exists T_DOWNLOAD_DATA(F_INDEX integer primary key autoincrement, F_ID text, F_LINK_ID text, F_PLAY_NUMBER text, F_COMPLETE integer, F_PATH text, F_FILE_SIZE integer, F_IMOMOE_SOURCE integer, F_TASK_ID integer, F_CREATE_TIME text, F_PROGRESS integer, F_DURATION integer)");
+    }
+
+    public static void deleteMaliMaliData() {
+        // 2023年3月26日19:50:51 清空所有MALIMALI源数据
+        db.execSQL("delete from T_FAVORITE where F_URL like '%/voddetail/%'", new String[]{});
+        Cursor historyCursor = db.rawQuery("select * from T_HISTORY where F_DESC_URL like '%/voddetail/%'", new String[]{});
+        if (historyCursor.getCount() > 0) {
+            while (historyCursor.moveToNext()) {
+                String historyId = historyCursor.getString(1);
+                // 删除历史记录字表
+                db.execSQL("delete from T_HISTORY_DATA where F_LINK_ID =?", new String[]{historyId});
+                // 删除历史记录主表
+                db.execSQL("delete from T_HISTORY where F_ID =?", new String[]{historyId});
+            }
+            historyCursor.close();
+        }
+    }
+
+    public static void deleteImomoeData() {
+        // 2022年5月29日20:39:00 清空imomoe的所有收藏、历史观看数据，不清除下载记录
+        Cursor cursor = db.rawQuery("select * from T_FAVORITE where F_URL like '%/view/%' ", new String[]{});
+        if (cursor.getCount() > 0) {
+            while (cursor.moveToNext()) {
+                String animeId = cursor.getString(2);
+                // 删除收藏夹
+                db.execSQL("delete from T_FAVORITE where F_LINK_ID =?", new String[]{animeId});
+            }
+            cursor.close();
+        }
+        Cursor historyCursor = db.rawQuery("select * from T_HISTORY where F_DESC_URL like '%/view/%'", new String[]{});
+        if (historyCursor.getCount() > 0) {
+            while (historyCursor.moveToNext()) {
+                String historyId = historyCursor.getString(1);
+                // 删除历史记录字表
+                db.execSQL("delete from T_HISTORY_DATA where F_LINK_ID =?", new String[]{historyId});
+                // 删除历史记录主表
+                db.execSQL("delete from T_HISTORY where F_ID =?", new String[]{historyId});
+            }
+            historyCursor.close();
+        }
     }
 
     /**
@@ -144,6 +189,8 @@ public class DatabaseUtil {
         db.endTransaction();
         Toast.makeText(Sakura.getInstance(), "数据迁移完毕", Toast.LENGTH_SHORT).show();
     }
+
+    public static void openDB() { if (null != db) db = SQLiteDatabase.openOrCreateDatabase(Utils.hasFilePermission() ? DB_PATH : Utils.getPrivateDbPath(), null);}
 
     /**
      * 关闭数据库连接
@@ -293,10 +340,29 @@ public class DatabaseUtil {
      * @param animeId 番剧ID
      * @return
      */
-    public static String queryAllIndex(String animeId) {
+    public static String queryAllIndex(String animeId, boolean isHistory, int playSource) {
+        Cursor cursor = db.rawQuery("select F_ID, F_DESC_URL from T_HISTORY WHERE F_LINK_ID = ? AND F_DESC_URL LIKE '%voddetail%'", new String[]{animeId});
+        if (cursor.getCount() > 0) {
+            while (cursor.moveToNext()) {
+                String id = cursor.getString(0);
+                String descNumber = cursor.getString(1).replaceAll("/voddetail/|.html", "");
+                // 删除错误的数据
+                db.execSQL("DELETE FROM T_HISTORY_DATA WHERE F_LINK_ID = ? AND F_PLAY_URL NOT LIKE '%"+descNumber+"%'", new String[] {
+                        id
+                });
+            }
+        }
+        cursor.close();
         StringBuffer buffer = new StringBuffer();
-        String Query = "select t2.F_PLAY_URL from T_HISTORY t1 INNER JOIN T_HISTORY_DATA t2 ON t1.F_ID = t2.F_LINK_ID where t1.F_LINK_ID =?";
-        Cursor c = db.rawQuery(Query, new String[]{animeId});
+        String Query = "";
+        Cursor c;
+        if (isHistory) {
+            Query = "select t2.F_PLAY_URL from T_HISTORY t1 INNER JOIN T_HISTORY_DATA t2 ON t1.F_ID = t2.F_LINK_ID AND t2.F_PLAY_SOURCE=? where t1.F_LINK_ID =?";
+            c = db.rawQuery(Query, new String[]{String.valueOf(playSource), animeId});
+        } else {
+            Query = "select t2.F_PLAY_URL from T_HISTORY t1 INNER JOIN T_HISTORY_DATA t2 ON t1.F_ID = t2.F_LINK_ID where t1.F_LINK_ID =?";
+            c = db.rawQuery(Query, new String[]{animeId});
+        }
         while (c.moveToNext()) {
             buffer.append(c.getString(0));
         }
@@ -588,7 +654,19 @@ public class DatabaseUtil {
      */
     public static List<HistoryBean> queryAllHistory(int limit, int offset) {
         List<HistoryBean> historyBeans = new ArrayList<>();
-        Cursor historyCursor = db.rawQuery("select t2.F_ID F_ANIME_ID, t1.F_ID, t2.F_TITLE, t1.F_DESC_URL, t2.F_SOURCE, t1.F_IMG_URL, t1.F_UPDATE_TIME " +
+        // 隐藏错误的历史记录
+        Cursor historyCursor = db.rawQuery("select t1.F_ID, COUNT(t2.F_ID) from T_HISTORY t1 \n" +
+                "left join T_HISTORY_DATA t2 on t1.F_ID = t2.F_LINK_ID\n" +
+                "where t1.F_VISIBLE = 1 \n" +
+                "GROUP BY t1.F_ID", null);
+        while (historyCursor.moveToNext()) {
+            String historyId = historyCursor.getString(0);
+            int count = historyCursor.getInt(1);
+            if (count == 0) {
+                db.execSQL("update T_HISTORY set F_VISIBLE = 0 where F_ID = ? ", new String[]{historyId}); // 当字表数据不存在时隐藏该历史记录
+            }
+        }
+        historyCursor = db.rawQuery("select t2.F_ID F_ANIME_ID, t1.F_ID, t2.F_TITLE, t1.F_DESC_URL, t2.F_SOURCE, t1.F_IMG_URL, t1.F_UPDATE_TIME " +
                 "from T_HISTORY t1 " +
                 "left join T_ANIME t2 on t1.F_LINK_ID = t2.F_ID " +
                 "where t1.F_VISIBLE = 1 " +
@@ -658,6 +736,25 @@ public class DatabaseUtil {
      */
     public static int queryDownloadCount() {
         Cursor cursor = db.rawQuery("SELECT * FROM T_DOWNLOAD" , null);
+        while (cursor.moveToNext()) {
+            String id = cursor.getString(1);
+            Cursor dataCursor = db.rawQuery("SELECT * FROM T_DOWNLOAD_DATA where F_LINK_ID = ?" , new String[]{id});
+            if (dataCursor.getCount() == 0)
+                db.execSQL("delete from T_DOWNLOAD where F_ID = ?", new String[]{id}); // 删除异常的数据
+            dataCursor.close();
+        }
+        cursor = db.rawQuery("SELECT * FROM T_DOWNLOAD" , null);
+        int count = cursor.getCount();
+        cursor.close();
+        return count;
+    }
+
+    /**
+     * 查询下载列表总数
+     * @return
+     */
+    public static int queryAllDownloadCount() {
+        Cursor cursor = db.rawQuery("SELECT t2.* FROM T_DOWNLOAD t1 LEFT JOIN T_DOWNLOAD_DATA t2 ON t1.F_ID = t2.F_LINK_ID" , null);
         int count = cursor.getCount();
         cursor.close();
         return count;
@@ -679,6 +776,7 @@ public class DatabaseUtil {
      * @param descUrl
      */
     public static void insertDownload(String animeTitle, int source, String imgUrl, String descUrl) {
+        Log.e("info", animeTitle+">"+source);
         String animeId = getAnimeID(animeTitle, source);
         if (checkDownload(animeId))
             db.execSQL("update T_DOWNLOAD set F_UPDATE_TIME =? where F_LINK_ID=?", new Object[]{
@@ -744,7 +842,7 @@ public class DatabaseUtil {
         if (path.contains(".m3u8")) {
             path = path.replaceAll("m3u8", "mp4");
             File file = new File(path);
-            db.execSQL("update T_DOWNLOAD_DATA set F_COMPLETE = 1, F_PATH=?, F_FILE_SIZE=? where F_LINK_ID=? AND F_TASK_ID=?",
+            db.execSQL("update T_DOWNLOAD_DATA set F_COMPLETE = 1, F_PATH=?, F_FILE_SIZE=?, F_TASK_ID = -99  where F_LINK_ID=? AND F_TASK_ID=?",
                     new Object[]{
                             path,
                             file.length(),
@@ -752,7 +850,7 @@ public class DatabaseUtil {
                             taskId
                     });
         } else
-            db.execSQL("update T_DOWNLOAD_DATA set F_COMPLETE = 1, F_PATH=?, F_FILE_SIZE=? where F_LINK_ID=? AND F_TASK_ID=?",
+            db.execSQL("update T_DOWNLOAD_DATA set F_COMPLETE = 1, F_PATH=?, F_FILE_SIZE=?, F_TASK_ID = -99 where F_LINK_ID=? AND F_TASK_ID=?",
                     new Object[]{
                             path,
                             fileSize,
@@ -782,6 +880,17 @@ public class DatabaseUtil {
                         taskId
                 });
         cursor.close();
+    }
+
+
+    /**
+     * 更新下载信息
+     */
+    public static void updateDownloadState(long taskId) {
+        db.execSQL("update T_DOWNLOAD_DATA set F_COMPLETE = 0 WHERE F_TASK_ID=?",
+                new Object[]{
+                        taskId
+                });
     }
 
     /**
@@ -924,12 +1033,17 @@ public class DatabaseUtil {
      * @return
      */
     public static List<Object> queryDownloadAnimeInfo(long taskId) {
-        Cursor cursor = db.rawQuery("select t3.F_TITLE, t3.F_SOURCE from T_DOWNLOAD_DATA t1 LEFT JOIN T_DOWNLOAD t2 ON t1.F_LINK_ID = t2.F_ID LEFT JOIN T_ANIME t3 ON t2.F_LINK_ID = t3.F_ID where t1.F_TASK_ID=?",
+        Cursor cursor = db.rawQuery("select t3.F_TITLE, t3.F_SOURCE from T_DOWNLOAD_DATA t1 " +
+                        "LEFT JOIN T_DOWNLOAD t2 ON t1.F_LINK_ID = t2.F_ID " +
+                        "LEFT JOIN T_ANIME t3 ON t2.F_LINK_ID = t3.F_ID where t1.F_TASK_ID=?",
                 new String[]{String.valueOf(taskId)});
         List<Object> objects = new ArrayList<>();
         cursor.moveToNext();
-        objects.add(cursor.getString(0));
-        objects.add(cursor.getInt(1));
+        if (cursor.getCount() > 0) {
+            objects.add(cursor.getString(0));
+            objects.add(cursor.getInt(1));
+//            Log.e("????" , "taskId：" +taskId + ",番剧名称：" +cursor.getString(0) + cursor.getInt(1));
+        }
         cursor.close();
         return objects;
     }
@@ -1014,5 +1128,64 @@ public class DatabaseUtil {
                 });
                 break;
         }
+    }
+
+    /**
+     * 删除重复taskID的错误数据
+     * @param context
+     */
+    public static void deleteDistinctData(Context context) {
+        Cursor cursor = db.rawQuery("select F_TASK_ID from T_DOWNLOAD_DATA where F_TASK_ID in (select F_TASK_ID from T_DOWNLOAD_DATA group by F_TASK_ID having count(*) > 1) group by F_TASK_ID", null);
+        if (cursor.getCount() > 0) {
+            while (cursor.moveToNext()) {
+                int taskId = cursor.getInt(0);
+                Aria.download(context).load(taskId).cancel();
+            }
+            cursor.close();
+        }
+        db.execSQL("delete from T_DOWNLOAD_DATA where F_TASK_ID in (select F_TASK_ID from T_DOWNLOAD_DATA group by F_TASK_ID having count(*) > 1) and F_COMPLETE = 0", new String[]{});
+        db.execSQL("delete from T_DOWNLOAD where F_ID not in (select F_LINK_ID from T_DOWNLOAD_DATA group by F_LINK_ID)", new String[]{});
+    }
+
+    /**
+     * 删除所有下载记录
+     */
+    public static void deleteAllDownloads() {
+        db.execSQL("delete from T_DOWNLOAD");
+        db.execSQL("delete from T_DOWNLOAD_DATA");
+    }
+
+    /**
+     * 2022年8月3日09:28:04新增
+     * 由于MALIMALI源地址变更需更新错误的播放记录
+     */
+    public static void updatePlayUrl() {
+        Cursor cursor = db.rawQuery("select F_ID, F_PLAY_URL from T_HISTORY_DATA WHERE F_PLAY_URL like '%/play/%'", null);
+        if (cursor.getCount() > 0) {
+            while (cursor.moveToNext()) {
+                String id = cursor.getString(0);
+                String url = cursor.getString(1).replaceAll("/play/", "/vodplay/");
+                db.execSQL("UPDATE T_HISTORY_DATA SET F_PLAY_URL = ? WHERE F_ID = ?", new String[] {
+                        url,
+                        id
+                });
+            }
+            cursor.close();
+        }
+    }
+
+    /**
+     * 删除数据库中不存在的任务
+     * @param context
+     * @param taskId
+     */
+    public static void deleteAbsentTask(Context context, long taskId) {
+        Cursor cursor = db.rawQuery("select * from T_DOWNLOAD_DATA where F_TASK_ID = ?", new String[]{String.valueOf(taskId)});
+        if (cursor.getCount() == 0) {
+            // 数据库中不存在 删除任务
+            Aria.download(context).load(taskId).ignoreCheckPermissions().cancel();
+            Log.e("删除不存在的任务", "TaskId：" + taskId);
+        }
+        cursor.close();
     }
 }

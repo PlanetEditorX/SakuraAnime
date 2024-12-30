@@ -4,7 +4,6 @@ import android.content.Intent;
 import android.os.Bundle;
 
 import com.chad.library.adapter.base.BaseQuickAdapter;
-import com.r0adkll.slidr.Slidr;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,7 +18,6 @@ import my.project.sakuraproject.adapter.UpdateListAdapter;
 import my.project.sakuraproject.bean.AnimeUpdateBean;
 import my.project.sakuraproject.main.base.BaseActivity;
 import my.project.sakuraproject.main.desc.DescActivity;
-import my.project.sakuraproject.util.SwipeBackLayoutUtil;
 import my.project.sakuraproject.util.Utils;
 
 public class UpdateListActivity extends BaseActivity<UpdateListContract.View, UpdateListPresenter> implements UpdateListContract.View {
@@ -51,7 +49,7 @@ public class UpdateListActivity extends BaseActivity<UpdateListContract.View, Up
 
     @Override
     protected void init() {
-        Slidr.attach(this, Utils.defaultInit());
+//        Slidr.attach(this, Utils.defaultInit());
         getBundle();
         initToolbar();
         initSwipe();
@@ -60,7 +58,7 @@ public class UpdateListActivity extends BaseActivity<UpdateListContract.View, Up
 
     @Override
     protected void initBeforeView() {
-        SwipeBackLayoutUtil.convertActivityToTranslucent(this);
+//        SwipeBackLayoutUtil.convertActivityToTranslucent(this);
     }
 
     public void getBundle() {
@@ -91,7 +89,6 @@ public class UpdateListActivity extends BaseActivity<UpdateListContract.View, Up
 
     public void initAdapter() {
         adapter = new UpdateListAdapter(this, list);
-        adapter.openLoadAnimation();
         adapter.openLoadAnimation(BaseQuickAdapter.ALPHAIN);
         adapter.setOnItemClickListener((adapter, view, position) -> {
             if (!Utils.isFastClick()) return;
@@ -104,6 +101,7 @@ public class UpdateListActivity extends BaseActivity<UpdateListContract.View, Up
         });
         if (Utils.checkHasNavigationBar(this)) mRecyclerView.setPadding(0,0,0, Utils.getNavigationBarHeight(this));
         mRecyclerView.setAdapter(adapter);
+        setRecyclerViewView();
     }
 
     @Override
@@ -117,7 +115,6 @@ public class UpdateListActivity extends BaseActivity<UpdateListContract.View, Up
             if (!mActivityFinish) {
                 mSwipe.setRefreshing(false);
                 list = animeList;
-                setRecyclerViewView();
                 adapter.setNewData(list);
             }
         });
@@ -127,7 +124,6 @@ public class UpdateListActivity extends BaseActivity<UpdateListContract.View, Up
     public void showErrorView(String msg) {
         runOnUiThread(() -> {
             if (!mActivityFinish) {
-                setRecyclerViewView();
                 mSwipe.setRefreshing(false);
                 errorTitle.setText(msg);
                 adapter.setEmptyView(errorView);

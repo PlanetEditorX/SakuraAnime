@@ -2,8 +2,10 @@ package my.project.sakuraproject.application;
 
 import android.app.Activity;
 import android.app.Application;
-import android.content.Intent;
+import android.os.Handler;
 import android.view.View;
+
+import androidx.appcompat.app.AppCompatDelegate;
 
 import com.arialyy.aria.core.Aria;
 import com.bumptech.glide.Glide;
@@ -17,9 +19,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import androidx.appcompat.app.AppCompatDelegate;
+import javax.net.ssl.HttpsURLConnection;
+
 import my.project.sakuraproject.R;
-import my.project.sakuraproject.services.DownloadService;
+import my.project.sakuraproject.bean.AnimeUpdateInfoBean;
+import my.project.sakuraproject.util.CropUtil;
 import my.project.sakuraproject.util.SharedPreferencesUtils;
 import my.project.sakuraproject.util.Utils;
 
@@ -33,25 +37,29 @@ public class Sakura extends Application {
     public String error;
     public JSONObject week = new JSONObject();
     public static boolean isImomoe = false;
+    public List<AnimeUpdateInfoBean> animeUpdateInfoBeans;
     public static Sakura getInstance() {
         return appContext;
     }
     // yhdm最近更新动漫
     public static String YHDM_UPDATE;
-    // imomoe最近更新动漫
-    public static String IMOMOE_UPDATE;
+
+    public static Handler mainHandler;
 
     @Override
     public void onCreate() {
         super.onCreate();
+        mainHandler = new Handler(this.getMainLooper());
         Utils.init(this);
+        // 忽略Https验证
+        HttpsURLConnection.setDefaultSSLSocketFactory(CropUtil.getUnsafeSslSocketFactory());
 //        CrashHandler crashHandler = CrashHandler.getInstance();
 //        crashHandler.init(getApplicationContext());
-        if (Utils.isServiceRunning(this, "my.project.sakuraproject.services.DownloadService")) {
+        /*if (Utils.isServiceRunning(this, "my.project.sakuraproject.services.DownloadService")) {
             // 应用异常重启时，停止服务，关闭下载
             stopService(new Intent(this, DownloadService.class));
             Aria.download(this).stopAllTask();
-        }
+        }*/
         if (Utils.getTheme())
             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES);
         else
@@ -63,6 +71,7 @@ public class Sakura extends Application {
         // 2022年2月28日18:09:33 默认改为1
 //        Aria.get(this).getDownloadConfig().setMaxTaskNum((Integer) SharedPreferencesUtils.getParam(this, "download_number", 0) + 1).setConvertSpeed(true).setMaxSpeed(0);
         Aria.get(this).getDownloadConfig().setMaxTaskNum(1);
+        Aria.get(this).getDownloadConfig().setConvertSpeed(true);
     }
 
     @Override
@@ -83,20 +92,20 @@ public class Sakura extends Application {
     public static void setApi() {
         isImomoe = Utils.isImomoe();
         DOMAIN = isImomoe ? (String) SharedPreferencesUtils.getParam(appContext, "imomoe_domain", Utils.getString(R.string.imomoe_url)) : (String) SharedPreferencesUtils.getParam(appContext, "domain", Utils.getString(R.string.domain_url));
-        TAG_API = isImomoe ?  DOMAIN + "/so.asp" : DOMAIN + "/sitemap";
-        JCB_API = isImomoe ? "/search.asp?page=1&searchword=%BE%E7%B3%A1" : "/37/";
-        SEARCH_API = isImomoe ? DOMAIN + "/search.asp" : DOMAIN + "/search/";
-        MOVIE_API = isImomoe ? "/list/%s.html" : "/movie/";
+        TAG_API = DOMAIN + "/sitemap";
+        JCB_API =  "/37/";
+        SEARCH_API = isImomoe ? DOMAIN : DOMAIN + "/search/";
+        MOVIE_API = "/movie/";
         YHDM_UPDATE = String.format("%s/new/", SharedPreferencesUtils.getParam(appContext, "domain", Utils.getString(R.string.domain_url)));
-        IMOMOE_UPDATE = String.format("%s/top/new.html", SharedPreferencesUtils.getParam(appContext, "imomoe_domain", Utils.getString(R.string.imomoe_url)));
     }
 
     public void showSnackbarMsgAction(View view, String msg, String actionMsg, View.OnClickListener listener) {
         Snackbar.make(view, msg, Snackbar.LENGTH_LONG).setAction(actionMsg, listener).show();
     }
 
-    public void showSnackbarMsg(View view, String msg) {
+    public void showSnackbarMsg(View view, String msg, View anchorView) {
         Snackbar snackbar = Snackbar.make(view, msg, Snackbar.LENGTH_LONG);
+        snackbar.setAnchorView(anchorView);
         snackbar.getView().setBackgroundColor(getResources().getColor(R.color.colorAccent));
         snackbar.show();
     }

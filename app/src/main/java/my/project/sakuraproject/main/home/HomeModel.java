@@ -18,6 +18,7 @@ import okhttp3.Callback;
 import okhttp3.Response;
 
 public class HomeModel extends BaseModel implements HomeContract.Model {
+
     @Override
     public void getData(boolean isWeek, HomeContract.LoadDataCallback callback) {
         if (isImomoe())
@@ -53,10 +54,11 @@ public class HomeModel extends BaseModel implements HomeContract.Model {
                             }
                             else {
                                 List<HomeBean> homeBeans = YhdmJsoupUtils.getHomeAllData(source);
-                                List<AnimeUpdateInfoBean> animeUpdateInfoBeans = YhdmJsoupUtils.getHomeUpdateInfo(source);
-                                if (homeBeans.size() > 0 && animeUpdateInfoBeans.size() > 0) {
+//                                List<AnimeUpdateInfoBean> animeUpdateInfoBeans = YhdmJsoupUtils.getHomeUpdateInfo(source);
+//                                if (homeBeans.size() > 0 && animeUpdateInfoBeans.size() > 0) {
+                                if (homeBeans.size() > 0) {
                                     callback.homeSuccess(homeBeans);
-                                    callback.updateInfoSuccess(animeUpdateInfoBeans);
+//                                    callback.updateInfoSuccess(animeUpdateInfoBeans);
                                 }
                                 else
                                     callback.error(Utils.getString(R.string.parsing_error));

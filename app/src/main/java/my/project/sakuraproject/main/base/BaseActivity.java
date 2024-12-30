@@ -1,6 +1,7 @@
 package my.project.sakuraproject.main.base;
 
 import android.Manifest;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.Color;
@@ -9,29 +10,33 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.Settings;
+import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.TextView;
+import android.widget.Toast;
 
-import java.util.List;
-
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
+
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.permissionx.guolindev.PermissionX;
+
+import java.util.ArrayList;
+import java.util.List;
+
 import butterknife.ButterKnife;
 import butterknife.Unbinder;
 import my.project.sakuraproject.R;
 import my.project.sakuraproject.application.Sakura;
-import my.project.sakuraproject.custom.CustomToast;
 import my.project.sakuraproject.database.DatabaseUtil;
+import my.project.sakuraproject.util.SharedPreferencesUtils;
 import my.project.sakuraproject.util.StatusBarUtil;
 import my.project.sakuraproject.util.Utils;
-import pub.devrel.easypermissions.EasyPermissions;
-import pub.devrel.easypermissions.PermissionRequest;
 
-public abstract class BaseActivity<V, P extends Presenter<V>> extends AppCompatActivity implements EasyPermissions.PermissionCallbacks {
+public abstract class BaseActivity<V, P extends Presenter<V>> extends AppCompatActivity {
     protected P mPresenter;
     public View errorView, emptyView;
     public TextView errorTitle;
@@ -39,28 +44,33 @@ public abstract class BaseActivity<V, P extends Presenter<V>> extends AppCompatA
     private Unbinder mUnBinder;
     protected boolean mActivityFinish = false;
     protected boolean isDarkTheme;
-    protected static String PREVIDEOSTR = "上一集：%s";
-    protected static String NEXTVIDEOSTR = "下一集：%s";
-    // 黑暗模式问题
-    private boolean isChanged = false;
+    protected static String PREVIDEOSTR = "上一集 %s";
+    protected static String NEXTVIDEOSTR = "下一集 %s";
+    protected boolean isPortrait;
+    protected int position = 0;
+    protected int change;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Configuration mConfiguration = getResources().getConfiguration();
+        change = mConfiguration.orientation;
+        if (change == mConfiguration.ORIENTATION_LANDSCAPE) isPortrait = false;
+        else if (change == mConfiguration.ORIENTATION_PORTRAIT) isPortrait = true;
         isDarkTheme = Utils.getTheme();
         if (isDarkTheme)
             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES);
         else
             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO);
-        if (!getRunningActivityName().equals("StartActivity")) overridePendingTransition(R.anim.activity_in, R.anim.activity_out);
+//        if (!getRunningActivityName().equals("StartActivity")) overridePendingTransition(R.anim.activity_in, R.anim.activity_out);
         initBeforeView();
         setContentView(setLayoutRes());
         if (Utils.checkHasNavigationBar(this)) {
-            if (!getRunningActivityName().equals("PlayerActivity"))
+            /*if (!getRunningActivityName().equals("PlayerActivity"))
                 getWindow().setFlags(
                         WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                         WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
-                );
+                );*/
             getWindow().setNavigationBarColor(Color.TRANSPARENT);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 getWindow().setNavigationBarDividerColor(Color.TRANSPARENT);
@@ -88,18 +98,65 @@ public abstract class BaseActivity<V, P extends Presenter<V>> extends AppCompatA
             application = (Sakura) getApplication();
         }
         application.addActivity(this);
-        if (EasyPermissions.hasPermissions(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
-            isManager();
+        if (gtSdk30()) {
+            // 安卓11及以上
+            if (Environment.isExternalStorageManager()) // 如果授予了所有文件授权
+                SharedPreferencesUtils.setParam(this, "set_file_manager_permission", 2);
+            int userSetPermission = (int) SharedPreferencesUtils.getParam(this, "set_file_manager_permission", 0);
+            if (userSetPermission == 0 && !Environment.isExternalStorageManager())
+            {
+                Utils.showAlert(this,
+                        getString(R.string.authorize_title_msg),
+                        getString(R.string.file_manger_msg),
+                        false,
+                        getString(R.string.accept_msg),
+                        Utils.getString(R.string.refuse_msg),
+                        null,
+                        (dialogInterface, i) -> {
+                            dialogInterface.dismiss();
+                            checkPermissions();
+                        },
+                        (dialogInterface, i) -> {
+                            SharedPreferencesUtils.setParam(this, "set_file_manager_permission", 1);
+                            dialogInterface.dismiss();
+                            build();
+                        },
+                        null);
+            } else if (userSetPermission == 2)
+                checkPermissions();
+            else
+                build();
+        } else // 其他版本获取权限
+            checkPermissions();
+    }
+
+    private void checkPermissions() {
+        List<String> permissions = new ArrayList<>();
+        if (gtSdk33()) {
+            permissions.add(Manifest.permission.READ_MEDIA_IMAGES);
+            permissions.add(Manifest.permission.READ_MEDIA_AUDIO);
+            permissions.add(Manifest.permission.READ_MEDIA_VIDEO);
+            permissions.add(Manifest.permission.POST_NOTIFICATIONS);
         } else {
-/*            EasyPermissions.requestPermissions(this, Utils.getString(R.string.permissions),
-                    300, Manifest.permission.WRITE_EXTERNAL_STORAGE);*/
-            EasyPermissions.requestPermissions(
-                    new PermissionRequest.Builder(this, 300, Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                            .setRationale(R.string.permissions)
-                            .setPositiveButtonText(R.string.page_positive)
-                            .setTheme(R.style.DialogStyle)
-                            .build());
+            permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+            permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
         }
+        PermissionX.init(this)
+                .permissions(permissions)
+                .onExplainRequestReason((scope, deniedList) -> {
+                    scope.showRequestReasonDialog(deniedList, getString(R.string.permissions), "同意", "不同意");
+                })
+                .onForwardToSettings((scope, deniedList) -> {
+                    scope.showForwardToSettingsDialog(deniedList, getString(R.string.permissions), "同意", "不同意");
+                })
+                .request((allGranted, grantedList, deniedList) -> {
+                    if (allGranted) {
+                        isManager();
+                    } else {
+                        Toast.makeText(this, getString(R.string.permissions_error), Toast.LENGTH_SHORT).show();
+                        finish();
+                    }
+                });
     }
 
     protected abstract P createPresenter();
@@ -161,21 +218,9 @@ public abstract class BaseActivity<V, P extends Presenter<V>> extends AppCompatA
     }
 
     @Override
-    public void onPermissionsGranted(int requestCode, List<String> perms) {
-        isManager();
-    }
-
-    @Override
-    public void onPermissionsDenied(int requestCode, List<String> perms) {
-//        application.showErrorToastMsg(Utils.getString(R.string.permissions_error));
-        CustomToast.showToast(this, Utils.getString(R.string.permissions_error), CustomToast.ERROR);
-        application.removeALLActivity();
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        EasyPermissions.onRequestPermissionsResult(requestCode, permissions, grantResults, this);
+    protected void onResume() {
+        super.onResume();
+        DatabaseUtil.openDB();
     }
 
     public boolean gtSdk23() {
@@ -190,6 +235,10 @@ public abstract class BaseActivity<V, P extends Presenter<V>> extends AppCompatA
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.R;
     }
 
+    public boolean gtSdk33() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU;
+    }
+
     private String getRunningActivityName() {
         String contextString = this.toString();
         return contextString.substring(contextString.lastIndexOf(".") + 1,
@@ -201,9 +250,6 @@ public abstract class BaseActivity<V, P extends Presenter<V>> extends AppCompatA
                 !getRunningActivityName().equals("PlayerActivity") &&
                 !getRunningActivityName().equals("LocalPlayerActivity") &&
                 !getRunningActivityName().equals("ImomoePlayerActivity") &&
-                !getRunningActivityName().equals("DefaultX5WebActivity") &&
-                !getRunningActivityName().equals("X5WebActivity") &&
-                !getRunningActivityName().equals("DefaultNormalWebActivity") &&
                 !getRunningActivityName().equals("NormalWebActivity") &&
                 !getRunningActivityName().equals("DLNAActivity")) {
             if (gtSdk23()) {
@@ -217,17 +263,36 @@ public abstract class BaseActivity<V, P extends Presenter<V>> extends AppCompatA
 
     private void isManager() {
         if (gtSdk30()) {
-            if (Environment.isExternalStorageManager()) build();
-            else getManager();
-        } else build();
+            if (Environment.isExternalStorageManager()) {
+                SharedPreferencesUtils.setParam(this, "set_file_manager_permission", 2);
+                build();
+            } else {
+                /*int userSetPermission = (int) SharedPreferencesUtils.getParam(this, "set_file_manager_permission", 0);
+                if (userSetPermission == 0)
+                    getManager();
+                else
+                    build();*/
+                Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
+                intent.setData(Uri.parse("package:" + getPackageName()));
+                startActivityForResult(intent, 0x99);
+            }
+        } else {
+            SharedPreferencesUtils.setParam(this, "set_file_manager_permission", 2);
+            build();
+        }
     }
 
     private void build() {
         //创建database路路径
         Utils.createFile();
         DatabaseUtil.CREATE_TABLES();
-        if (getRunningActivityName().equals("StartActivity"))
+        if (getRunningActivityName().equals("StartActivity")) {
             DatabaseUtil.dataTransfer();
+            DatabaseUtil.deleteImomoeData();
+            DatabaseUtil.updatePlayUrl();
+//            DatabaseUtil.deleteMaliMaliData();
+        }
+        hideGap();
         setStatusBarColor();
         initCustomViews();
         init();
@@ -236,20 +301,25 @@ public abstract class BaseActivity<V, P extends Presenter<V>> extends AppCompatA
     }
 
     private void getManager() {
-        AlertDialog alertDialog;
-        AlertDialog.Builder builder = new AlertDialog.Builder(this, R.style.DialogStyle);
-        builder.setPositiveButton(Utils.getString(R.string.authorize_msg), null);
-        builder.setTitle(Utils.getString(R.string.authorize_title_msg));
-        builder.setMessage(Utils.getString(R.string.file_manger_msg));
-        builder.setCancelable(false);
-        alertDialog = builder.create();
-        alertDialog.show();
-        alertDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-            alertDialog.dismiss();
-            Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
-            intent.setData(Uri.parse("package:" + getPackageName()));
-            startActivityForResult(intent, 0x99);
-        });
+        Utils.showAlert(this,
+                getString(R.string.authorize_title_msg),
+                getString(R.string.file_manger_msg),
+                false,
+                getString(R.string.authorize_msg),
+                Utils.getString(R.string.refuse_msg),
+                null,
+                (dialogInterface, i) -> {
+                    dialogInterface.dismiss();
+                    Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
+                    intent.setData(Uri.parse("package:" + getPackageName()));
+                    startActivityForResult(intent, 0x99);
+                },
+                (dialogInterface, i) -> {
+                    SharedPreferencesUtils.setParam(this, "set_file_manager_permission", 1);
+                    dialogInterface.dismiss();
+                    build();
+                },
+                null);
     }
 
     @Override
@@ -261,23 +331,17 @@ public abstract class BaseActivity<V, P extends Presenter<V>> extends AppCompatA
     @Override
     public void finish() {
         super.finish();
-        if (!getRunningActivityName().equals("StartActivity")) overridePendingTransition(R.anim.activity_in, R.anim.activity_out);
+//        if (!getRunningActivityName().equals("StartActivity")) overridePendingTransition(R.anim.activity_in, R.anim.activity_out);
     }
 
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
-        if (Utils.isPad()) {
-            if (!isDarkTheme) isChanged = false; // 如果不是黑暗模式则跳过
-            if (isChanged) {
-                // 阻止黑暗模式调用两次
-                isChanged = false;
-                return;
-            } else {
-                isChanged = true;
-                setConfigurationChanged();
-            }
-        }
+        // 防止两次调用
+        if (newConfig.orientation == change) return;
+        change = newConfig.orientation;
+        isPortrait = newConfig.orientation == Configuration.ORIENTATION_PORTRAIT;
+        setConfigurationChanged();
     }
 
     protected abstract void setConfigurationChanged();

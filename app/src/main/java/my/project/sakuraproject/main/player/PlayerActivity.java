@@ -3,6 +3,7 @@ package my.project.sakuraproject.main.player;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.widget.Toast;
 
 import org.greenrobot.eventbus.EventBus;
 
@@ -15,7 +16,6 @@ import my.project.sakuraproject.api.Api;
 import my.project.sakuraproject.application.Sakura;
 import my.project.sakuraproject.bean.AnimeDescDetailsBean;
 import my.project.sakuraproject.bean.Event;
-import my.project.sakuraproject.bean.ImomoeVideoUrlBean;
 import my.project.sakuraproject.custom.CustomToast;
 import my.project.sakuraproject.main.base.BaseModel;
 import my.project.sakuraproject.main.video.VideoContract;
@@ -47,6 +47,7 @@ public class PlayerActivity extends BasePlayerActivity implements VideoContract.
         yhdmDescList = (List<AnimeDescDetailsBean>) bundle.getSerializable("list");
         clickIndex = bundle.getInt("clickIndex");
         animeId = bundle.getString("animeId");
+        nowSource = bundle.getInt("nowSource");
     }
 
     @Override
@@ -71,7 +72,21 @@ public class PlayerActivity extends BasePlayerActivity implements VideoContract.
         */
         if (webUrl.contains("jx.618g.com")) {
             cancelDialog();
-            VideoUtils.openDefaultWebview(this, webUrl);
+//            VideoUtils.openDefaultWebview(this, webUrl);
+            Utils.viewInChrome(this, webUrl);
+        } else if (webUrl.contains("html")) {
+            VideoUtils.showParseAlert(this, (dialog, index) -> {
+                dialog.dismiss();
+                url = String.format(Api.PARSE_INTERFACE[index], url);
+                if (index == Api.PARSE_INTERFACE.length -1) {
+//                    VideoUtils.openDefaultWebview(this, url);
+                    Utils.viewInChrome(this, webUrl);
+                    this.finish();
+                } else {
+                    SniffingUtil.get().activity(this).referer(url).callback(this).url(url).start();
+                    Toast.makeText(this, Utils.getString(R.string.select_parse_interface_msg), Toast.LENGTH_LONG).show();
+                }
+            });
         } else {
             url = String.format(Api.PARSE_API, url);
             SniffingUtil.get().activity(this).referer(url).callback(this).url(url).start();
@@ -97,13 +112,13 @@ public class PlayerActivity extends BasePlayerActivity implements VideoContract.
     @Override
     protected AnimeDescDetailsBean setAnimeDescDetailsBean(int position) {
         alertDialog = Utils.getProDialog(this, R.string.parsing);
-        EventBus.getDefault().post(new Event(false, -1, position));
-        return (AnimeDescDetailsBean) dramaAdapter.getItem(position);
+        EventBus.getDefault().post(new Event(isSiliSili(), nowSource, position));
+        return dramaAdapter.getItem(position);
     }
 
     @Override
     protected void changeVideo(String title) {
-        videoPresenter = new VideoPresenter(animeTitle, dramaUrl, 0, title, this);
+        videoPresenter = new VideoPresenter(animeTitle, dramaUrl, nowSource, title, this);
         videoPresenter.loadData(true);
     }
 
@@ -133,8 +148,9 @@ public class PlayerActivity extends BasePlayerActivity implements VideoContract.
     @Override
     public void getVideoEmpty() {
         runOnUiThread(() -> {
+            player.onStateError();
             hideNavBar();
-            VideoUtils.showErrorInfo(this, BaseModel.getDomain(false) + dramaUrl);
+            VideoUtils.showErrorInfo(this, dramaUrl, true);
         });
     }
 
@@ -142,16 +158,20 @@ public class PlayerActivity extends BasePlayerActivity implements VideoContract.
     public void getVideoError() {
         //网络出错
         runOnUiThread(() -> {
+            player.onStateError();
             hideNavBar();
 //            application.showErrorToastMsg(Utils.getString(R.string.error_700));
-            VideoUtils.showPlayerNetworkErrorDialog(this, (dialog, index) -> videoPresenter.loadData(true));
+//            VideoUtils.showPlayerNetworkErrorDialog(this, (dialog, index) -> videoPresenter.loadData(true));
+            VideoUtils.showErrorInfo(this, dramaUrl, true);
         });
     }
 
     @Override
     public void showSuccessYhdmDramasView(List<AnimeDescDetailsBean> dramaList) {
-        yhdmDescList = dramaList;
-        runOnUiThread(() -> dramaAdapter.setNewData(yhdmDescList));
+        if (yhdmDescList.size() == 0) {
+            yhdmDescList = dramaList;
+            runOnUiThread(() -> dramaAdapter.setNewData(yhdmDescList));
+        }
     }
 
     @Override
@@ -163,10 +183,21 @@ public class PlayerActivity extends BasePlayerActivity implements VideoContract.
     }
 
     @Override
-    public void showSuccessImomoeVideoUrlsView(List<List<ImomoeVideoUrlBean>> bean) {}
+    public void showSuccessImomoeVideoUrlView(String playUrl) {
+        runOnUiThread(() -> {
+            hideNavBar();
+            cancelDialog();
+            checkPlayUrl(playUrl);
+        });
+    }
 
     @Override
-    public void showSuccessImomoeDramasView(List<List<AnimeDescDetailsBean>> bean) {}
+    public void showSuccessImomoeDramasView(List<AnimeDescDetailsBean> bean) {
+        if (yhdmDescList.size() == 0) {
+            yhdmDescList = bean;
+            runOnUiThread(() -> dramaAdapter.setNewData(yhdmDescList));
+        }
+    }
 
     @Override
     public void onSniffingStart(View webView, String url) {
@@ -205,7 +236,8 @@ public class PlayerActivity extends BasePlayerActivity implements VideoContract.
     private void GetRealPlayingAddressError(String url) {
 //        Sakura.getInstance().showToastMsg(Utils.getString(R.string.open_web_view));
         CustomToast.showToast(this, Utils.getString(R.string.open_web_view), CustomToast.WARNING);
-        VideoUtils.openDefaultWebview(this, url);
+//        VideoUtils.openDefaultWebview(this, url);
+        Utils.viewInChrome(this, url);
         finish();
     }
 
@@ -231,10 +263,23 @@ public class PlayerActivity extends BasePlayerActivity implements VideoContract.
     }
 
     private void checkPlayUrl(String url) {
-        if (!url.contains("$"))
-            play(url);
-        else
-            snifferPlayUrl(url);
+        if (isSiliSili()) {
+            // 当为silisili源时校验
+            // 2023年10月13日16:13:43 新版解析不需要校验
+            /*if (!url.contains("http")) {
+                // 尝试获取真实的播放地址
+                Toast.makeText(this, "不是播放地址，尝试第二套解析方式", Toast.LENGTH_SHORT).show();
+                videoPresenter = new VideoPresenter(url, this);
+                videoPresenter.tryGetSilisiliPlayUrl();
+            } else*/
+                play(url);
+        } else {
+            // yhdm
+            if (!url.contains("$"))
+                play(url);
+            else
+                snifferPlayUrl(url);
+        }
     }
 
     /**
@@ -255,7 +300,8 @@ public class PlayerActivity extends BasePlayerActivity implements VideoContract.
         */
         if (webUrl.contains("jx.618g.com")) {
             cancelDialog();
-            VideoUtils.openDefaultWebview(this, webUrl);
+//            VideoUtils.openDefaultWebview(this, webUrl);
+            Utils.viewInChrome(this, webUrl);
         } else {
             url = String.format(Api.PARSE_API, url);
             SniffingUtil.get().activity(this).referer(url).callback(this).url(url).start();

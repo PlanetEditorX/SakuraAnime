@@ -2,8 +2,6 @@ package my.project.sakuraproject.util;
 
 import android.util.Log;
 
-import com.chad.library.adapter.base.entity.MultiItemEntity;
-
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -17,15 +15,16 @@ import java.util.LinkedHashMap;
 import java.util.List;
 
 import my.project.sakuraproject.R;
+import my.project.sakuraproject.adapter.HomeAdapter;
 import my.project.sakuraproject.bean.AnimeDescDetailsBean;
 import my.project.sakuraproject.bean.AnimeDescListBean;
 import my.project.sakuraproject.bean.AnimeDescRecommendBean;
+import my.project.sakuraproject.bean.AnimeDramasBean;
 import my.project.sakuraproject.bean.AnimeListBean;
 import my.project.sakuraproject.bean.AnimeUpdateBean;
 import my.project.sakuraproject.bean.AnimeUpdateInfoBean;
 import my.project.sakuraproject.bean.HomeBean;
 import my.project.sakuraproject.bean.TagBean;
-import my.project.sakuraproject.bean.TagHeaderBean;
 
 /**
  * http://www.yhdm.io/ 站点解析类
@@ -83,12 +82,35 @@ public class YhdmJsoupUtils {
     /**************************************  获取首页相关信息解析方法开始  **************************************/
     public static List<HomeBean> getHomeAllData(String source) {
         Document document = Jsoup.parse(source);
+        List<HomeBean> homeBeanList = new ArrayList<>();
+        // banner 数据
+        Elements bannerEle = document.select("div.hero-wrap > ul.heros > li");
+        List<HomeBean.HomeItemBean> bannerItems = new ArrayList<>();
+        HomeBean bannerBean = new HomeBean();
+        if (Utils.isPad()) {
+            // 平板不显示banner轮播
+            bannerBean.setTitle("动漫推荐");
+            bannerBean.setMoreUrl("");
+            bannerBean.setDataType(HomeAdapter.TYPE_LEVEL_2);
+        } else
+            bannerBean.setDataType(HomeAdapter.TYPE_LEVEL_1);
+        for (Element element : bannerEle) {
+            HomeBean.HomeItemBean itemBean = new HomeBean.HomeItemBean();
+            itemBean.setTitle(element.select("a").attr("title"));
+            itemBean.setUrl(element.select("a").attr("href"));
+            itemBean.setImg(element.select("img").attr("src"));
+            itemBean.setEpisodes(element.getElementsByTag("em").text());
+            bannerItems.add(itemBean);
+        }
+        bannerBean.setData(bannerItems);
+        homeBeanList.add(bannerBean);
         Elements titles = document.select("div.firs > div.dtit");
         Log.e("titles", titles.size() + "");
         Elements data = document.select("div.firs > div.img");
-        List<HomeBean> homeBeanList = new ArrayList<>();
+
         for (int i=0,size=titles.size(); i<size; i++) {
             HomeBean homeBean = new HomeBean();
+            homeBean.setDataType(HomeAdapter.TYPE_LEVEL_2);
             String title = titles.get(i).select("h2 > a").text();
             String moreUrl = titles.get(i).select("h2 > a").attr("href");
             homeBean.setTitle(title);
@@ -288,29 +310,29 @@ public class YhdmJsoupUtils {
      * @param source
      * @return
      */
-    public static List<MultiItemEntity> getTagList(String source) {
-        List<MultiItemEntity> tagList = new ArrayList<>();
+    public static List<TagBean> getTagList(String source) {
         Document document = Jsoup.parse(source);
         Elements titles = document.select("div.dtit");
         Elements items = document.select("div.link");
+        List<TagBean> tagBeans = new ArrayList<>();
         if (titles.size() == items.size()) {
             for (int i=1,tagSize=titles.size(); i<tagSize; i++) {
-                TagHeaderBean tagHeaderBean = new TagHeaderBean(titles.get(i).text());
+                TagBean tagBean = new TagBean();
+                tagBean.setTitle(titles.get(i).text());
                 Elements itemElements = items.get(i).select("a");
+                List<TagBean.TagSelectBean> tagSelectBeans = new ArrayList<>();
                 for (int j = 0, itemSize = itemElements.size(); j < itemSize; j++) {
-                    tagHeaderBean.addSubItem(
-                            new TagBean(
-                                    tagHeaderBean.getTitle() + " - " + itemElements.get(j).text(),
-                                    itemElements.get(j).text(),
-                                    itemElements.get(j).attr("href")
-                            )
-                    );
+                    TagBean.TagSelectBean tagSelectBean = new TagBean.TagSelectBean();
+                    tagSelectBean.setTagTitle(tagBean.getTitle() + " - " + itemElements.get(j).text());
+                    tagSelectBean.setTitle(itemElements.get(j).text());
+                    tagSelectBean.setUrl(itemElements.get(j).attr("href"));
+                    tagSelectBeans.add(tagSelectBean);
                 }
-                tagList.add(tagHeaderBean);
+                tagBean.setTagSelectBeans(tagSelectBeans);
+                tagBeans.add(tagBean);
             }
-            return tagList;
-        } else
-            return tagList;
+        }
+        return tagBeans;
     }
     /**************************************  动漫分类解析方法结束  **************************************/
 
@@ -360,6 +382,9 @@ public class YhdmJsoupUtils {
     public static AnimeDescListBean getAnimeDescList(String source, String dramaStr) {
         AnimeDescListBean animeDescListBean = new AnimeDescListBean();
         Document document = Jsoup.parse(source);
+        List<AnimeDramasBean> animeDramasBeans = new ArrayList<>();
+        AnimeDramasBean animeDramasBean = new AnimeDramasBean();
+        animeDramasBean.setListTitle("默认播放列表");
         Elements dramaElements = document.select("div.movurl > ul > li"); //剧集列表
         if (dramaElements.size() > 0) {
             /** 封装剧集 **/
@@ -370,9 +395,11 @@ public class YhdmJsoupUtils {
                 String watchUrl = dramaElements.get(i).select("a").attr("href");
                 if (dramaStr.contains(watchUrl)) select = true;
                 else select = false;
-                animeDescDramasBeans.add(new AnimeDescDetailsBean(name, watchUrl, select));
+                animeDescDramasBeans.add(new AnimeDescDetailsBean(i+1, name, watchUrl, select));
             }
-            animeDescListBean.setAnimeDescDetailsBeans(animeDescDramasBeans);
+            animeDramasBean.setAnimeDescDetailsBeanList(animeDescDramasBeans);
+            animeDramasBeans.add(animeDramasBean);
+            animeDescListBean.setAnimeDramasBeans(animeDramasBeans);
             /** 封装多季 **/
             Elements multiElements = document.select("div.img > ul > li"); //多季
             if (multiElements.size() > 0) {
@@ -421,9 +448,9 @@ public class YhdmJsoupUtils {
                 dramaUrl = elements.get(i).select("a").attr("href");
                 dramaTitle = elements.get(i).select("a").text();
                 if (dataBaseDrama.contains(dramaUrl)) // 是否已经观看
-                    animeDescDetailsBeans.add(new AnimeDescDetailsBean(dramaTitle, dramaUrl, true));
+                    animeDescDetailsBeans.add(new AnimeDescDetailsBean(i+1, dramaTitle, dramaUrl, true));
                 else
-                    animeDescDetailsBeans.add(new AnimeDescDetailsBean(dramaTitle, dramaUrl, false));
+                    animeDescDetailsBeans.add(new AnimeDescDetailsBean(i+1, dramaTitle, dramaUrl, false));
             }
         } catch (Exception e) {
             e.printStackTrace();
